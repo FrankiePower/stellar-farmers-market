@@ -155,8 +155,6 @@ export default function Page() {
                 recentMessages={recentForBubbles}
                 peers={others}
                 onStep={(s) => postPosition(s)}
-                dancing={selfDance}
-                party={party}
                 waving={selfWave}
                 laughing={selfLaugh}
                 sitToggleSeq={sitSeq}

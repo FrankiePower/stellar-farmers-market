@@ -40,14 +40,12 @@ type Peer = {
   x: number
   y: number
   facing: "N" | "S" | "E" | "W"
-  dance?: boolean
   sit?: boolean
   wave?: boolean
   laugh?: boolean
 }
 
 type Seat = { x: number; y: number; facing: "N" | "S" | "E" | "W" }
-type MusicBox = { id: "sunny" | "night"; x: number; y: number; label: string }
 
 type Props = {
   room?: RoomPreset
@@ -56,16 +54,10 @@ type Props = {
   recentMessages?: ChatMessage[]
   peers?: Peer[]
   onStep?: (s: { x: number; y: number; facing: "N" | "S" | "E" | "W" }) => void
-  dancing?: boolean
-  party?: boolean
   waving?: boolean
   laughing?: boolean
   sitToggleSeq?: number
   onSitChange?: (v: boolean) => void
-  audioEnabled?: boolean
-  currentTrackId?: string
-  isPlaying?: boolean
-  onMusicBoxToggle?: (id: string) => void
 }
 
 type Avatar = { x: number; y: number; facing: "N" | "S" | "E" | "W" }
@@ -78,16 +70,10 @@ export default function IsoRoom({
   recentMessages = [],
   peers = [],
   onStep,
-  dancing = false,
-  party = false,
   waving = false,
   laughing = false,
   sitToggleSeq = 0,
   onSitChange,
-  audioEnabled = true,
-  currentTrackId,
-  isPlaying,
-  onMusicBoxToggle,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -103,12 +89,10 @@ export default function IsoRoom({
   const [isSitting, setIsSitting] = useState(false)
   const sitTargetRef = useRef<Seat | null>(null)
 
-  const confettiRef = useRef<{ x: number; y: number; c: string; vy: number }[]>([])
 
   const [hoverId, setHoverId] = useState<string | null>(null)
   const hoverTargetsRef = useRef<{ id: string; name: string; x: number; yHead: number }[]>([])
 
-  const interactRef = useRef<{ type: "music"; id: string; rect: { x: number; y: number; w: number; h: number } }[]>([])
 
   const smoothPeersRef = useRef<Map<string, { x: number; y: number; facing: Facing }>>(new Map())
   const authorBubblesRef = useRef<Map<string, Bubble>>(new Map())
@@ -116,14 +100,6 @@ export default function IsoRoom({
   const tileW = 54
   const tileH = 27
 
-  const getMusicBoxes = useCallback((r: RoomPreset): MusicBox[] => {
-    if (r === "Lobby") return [
-      { id: "sunny", x: 7, y: 3, label: "Sunny Chiptune" },
-      { id: "night", x: 13, y: 12, label: "Night Chiptune" },
-    ]
-    if (r === "Café") return [{ id: "sunny", x: 3, y: 7, label: "Sunny Chiptune" }]
-    return [{ id: "night", x: 11, y: 8, label: "Night Chiptune" }]
-  }, [])
 
   const seatsByRoom: Record<RoomPreset, Seat[]> = useMemo(() => ({
     Lobby: [
@@ -151,23 +127,20 @@ export default function IsoRoom({
       ;[[3, 4],[15, 10]].forEach(([x, y]) => { block(x, y); block(x + 1, y) })
       ;[[8, 2],[9, 2],[10, 2]].forEach(([x, y]) => block(x, y))
       ;[[6, 3],[13, 12]].forEach(([x, y]) => block(x, y))
-      getMusicBoxes("Lobby").forEach((m) => block(m.x, m.y))
       ;[[5, 9]].forEach(([x, y]) => block(x, y))
     } else if (room === "Café") {
       ;[[5,5],[6,5],[5,6],[14,5],[14,6],[13,5],[10,9],[10,10],[9,9]].forEach(([x,y]) => block(x,y))
       for (let x = 2; x <= 5; x++) block(x, 11)
       ;[[3,10],[4,10],[5,10]].forEach(([x,y]) => block(x,y))
       ;[[3, 8],[16, 4]].forEach(([x, y]) => block(x, y))
-      getMusicBoxes("Café").forEach((m) => block(m.x, m.y))
     } else {
       for (let y = 3; y < rows - 3; y += 3) for (let x = 3; x < cols - 3; x += 5) { block(x, y); block(x + 1, y) }
       ;[[6, 12],[12, 12]].forEach(([x, y]) => { block(x, y); block(x + 1, y) })
       for (let x = 8; x <= 11; x++) { block(x, 6); block(x, 10) }
       for (let y = 7; y <= 9; y++) { block(7, y); block(12, y) }
-      getMusicBoxes("Rooftop").forEach((m) => block(m.x, m.y))
     }
     return { cols, rows, walkable }
-  }, [room, getMusicBoxes])
+  }, [room])
 
   useEffect(() => {
     const map = authorBubblesRef.current
@@ -249,16 +222,6 @@ export default function IsoRoom({
     const px = e.clientX - rect.left
     const py = e.clientY - rect.top
 
-    const hit = interactRef.current.find((t) => px >= t.rect.x && px <= t.rect.x + t.rect.w && py >= t.rect.y && py <= t.rect.y + t.rect.h)
-    if (hit && hit.type === "music") {
-      onMusicBoxToggle?.(hit.id)
-      const mb = getMusicBoxes(room).find((m) => m.id === hit.id)
-      if (mb) {
-        const playing = currentTrackId === mb.id && isPlaying && audioEnabled
-        bubbleRef.current = { text: playing ? "⏸ Music paused" : `♪ ${mb.label}`, expiresAt: Date.now() + 2000 }
-      }
-      return
-    }
 
     const originInfo = computeCenteredOrigin(size.w, size.h, grid.cols, grid.rows, tileW, tileH)
     const params: IsoProjectParams = { tileW, tileH, originX: originInfo.x, originY: originInfo.y }
@@ -290,7 +253,7 @@ export default function IsoRoom({
       const facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "E" : "W") : dy > 0 ? "S" : "N"
       setAvatar((a) => ({ ...a, facing }))
     }
-  }, [avatar.x, avatar.y, grid, isSitting, onSitChange, size.w, tileH, tileW, room, onMusicBoxToggle, getMusicBoxes, currentTrackId, isPlaying, audioEnabled])
+  }, [avatar.x, avatar.y, grid, isSitting, onSitChange, size.w, tileH, tileW, room])
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -407,17 +370,7 @@ export default function IsoRoom({
       }
 
       drawWalls(ctx, grid, params, tileW, tileH)
-      interactRef.current = []
-      drawFurniture(ctx, room, params, tileW, tileH, animRef.current, party, {
-        currentTrackId,
-        isPlaying: !!isPlaying,
-        audioEnabled: !!audioEnabled,
-        interactiveOut: interactRef.current,
-        musicBoxes: getMusicBoxes(room),
-      }, { cols: grid.cols, rows: grid.rows })
-
-      updateConfetti(confettiRef.current, party, size.w, size.h)
-      drawConfetti(ctx, confettiRef.current)
+      drawFurniture(ctx, room, params, tileW, tileH, animRef.current)
 
       const smoothMap = smoothPeersRef.current
       const peerBlend = clamp(dt * 8, 0, 1)
@@ -437,7 +390,7 @@ export default function IsoRoom({
       const labels: { id: string; text: string; x: number; yHead: number }[] = []
       for (const { p, s } of peersSorted) {
         const { px: pX, py: pY } = projectIso(s.x, s.y, params)
-        drawAvatar(ctx, pX, pY, tileW, tileH, s.facing, animRef.current, false, p.color, !!p.dance, !!p.sit, !!p.wave, !!p.laugh)
+        drawAvatar(ctx, pX, pY, tileW, tileH, s.facing, animRef.current, false, p.color, false, !!p.sit, !!p.wave, !!p.laugh)
         const headY = pY - 26
         labels.push({ id: p.id, text: p.name || "Guest", x: pX, yHead: headY })
 
@@ -450,7 +403,7 @@ export default function IsoRoom({
       const { px: ax, py: ay } = projectIso(avatar.x, avatar.y, params)
       const walkingOrHeld = !isSitting && (!!heldDirRef.current || moving)
       const bob = Math.sin(animRef.current * 2.2) * (walkingOrHeld ? 1.5 : 0.6)
-      drawAvatar(ctx, ax, ay + (isSitting ? 0 : bob), tileW, tileH, avatar.facing, animRef.current, walkingOrHeld, undefined, dancing, isSitting, waving, laughing)
+      drawAvatar(ctx, ax, ay + (isSitting ? 0 : bob), tileW, tileH, avatar.facing, animRef.current, walkingOrHeld, undefined, false, isSitting, waving, laughing)
       const selfHeadY = (ay + (isSitting ? 0 : bob)) - 26
       labels.push({ id: "self", text: selfName, x: ax, yHead: selfHeadY })
 
@@ -476,7 +429,7 @@ export default function IsoRoom({
 
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
-  }, [avatar.facing, avatar.x, avatar.y, grid, room, size.w, size.h, peers, party, dancing, waving, laughing, isSitting, tryMoveOne, onStep, selfName, hoverId, getMusicBoxes, currentTrackId, isPlaying, audioEnabled])
+  }, [avatar.facing, avatar.x, avatar.y, grid, room, size.w, size.h, peers, waving, laughing, isSitting, tryMoveOne, onStep, selfName, hoverId])
 
   const onDoubleClick = useCallback(() => {
     bubbleRef.current = { text: ":)", expiresAt: Date.now() + 2000 }
@@ -632,35 +585,12 @@ function drawFurniture(
   params: IsoProjectParams,
   tileW: number,
   tileH: number,
-  t: number,
-  party: boolean,
-  opt: {
-    currentTrackId?: string
-    isPlaying: boolean
-    audioEnabled: boolean
-    interactiveOut: { type: "music"; id: string; rect: { x: number; y: number; w: number; h: number } }[]
-    musicBoxes: { id: "sunny" | "night"; x: number; y: number; label: string }[]
-  },
-  dims: { cols: number; rows: number }
+  t: number
 ) {
-    const sofa = (x: number, y: number, color = "#ef4444") => {
-      const A = projectIso(x, y, params); const B = projectIso(x + 1, y, params)
-      drawRaisedBlock(ctx, A.px, A.py, tileW, tileH, color, "#000", shade(color, -20))
-      drawRaisedBlock(ctx, B.px, B.py, tileW, tileH, color, "#000", shade(color, -20))
-    }
-    const roundTable = (x: number, y: number) => {
+    // Simple market stand
+    const marketStand = (x: number, y: number, color = "#8b4513") => {
       const { px, py } = projectIso(x, y, params)
-      circle(ctx, px, py - 10, 14, "#d29a4a")
-      ctx.strokeStyle = "#000"; ctx.stroke()
-      rect(ctx, px - 2, py, 4, 8, "#a36d27")
-    }
-    const palm = (x: number, y: number) => {
-      const { px, py } = projectIso(x, y, params)
-      rect(ctx, px - 4, py - 6, 8, 14, "#8b5a2b")
-      circle(ctx, px - 8, py - 12, 6, "#22c55e")
-      circle(ctx, px + 8, py - 12, 6, "#22c55e")
-      circle(ctx, px, py - 18, 7, "#16a34a")
-      ctx.strokeStyle = "#000"; ctx.stroke()
+      drawRaisedBlock(ctx, px, py, tileW, tileH, color, "#000", shade(color, -20))
     }
     const rug = (x: number, y: number, wTiles: number, hTiles: number, color = "#fde68a") => {
       const tl = projectIso(x, y, params)
