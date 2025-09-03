@@ -64,12 +64,8 @@ export default function Page() {
     sendMessage,
     others,
     postPosition,
-    setDance,
-    selfDance,
     setSit,
     selfSit,
-    party,
-    setPartySync,
     triggerWave,
     selfWave,
     triggerLaugh,
@@ -86,18 +82,6 @@ export default function Page() {
   const handleSend = useCallback(
     async (text: string) => {
       const t = text.trim().toLowerCase()
-      if (t.startsWith("/dance")) {
-        const arg = t.split(" ")[1]
-        const next = arg === "on" ? true : arg === "off" ? false : !selfDance
-        setDance(next)
-        return
-      }
-      if (t.startsWith("/party")) {
-        const arg = t.split(" ")[1]
-        const next = arg === "on" ? true : arg === "off" ? false : !party
-        setPartySync(next)
-        return
-      }
       if (t.startsWith("/sit")) {
         if (selfSit) setSit(false)
         else setSitSeq((n) => n + 1)
@@ -113,7 +97,7 @@ export default function Page() {
       }
       await sendMessage(text)
     },
-    [sendMessage, selfDance, setDance, party, setPartySync, selfSit, setSit, triggerWave, triggerLaugh]
+    [sendMessage, selfSit, setSit, triggerWave, triggerLaugh]
   )
 
   const handleRoomChange = useCallback((next: RoomPreset) => setRoom(next), [])
@@ -125,11 +109,11 @@ export default function Page() {
   const recentForBubbles = useMemo(() => messages.slice(-10), [messages])
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-[#9bbad3]">
-      <header className="border-b border-black/40 bg-[#2f2f2f]">
+    <div className="min-h-[100dvh] flex flex-col bg-[#a3b18a]">
+      <header className="border-b border-black/40 bg-[#344e41]">
         <div className="max-w-6xl mx-auto px-3 py-2 flex items-center gap-3">
           <div className={styles.logoBlock} aria-label="Pixel Plaza logo">
-            <span className={styles.logoWord}>PIXEL PLAZA</span>
+            <span className={styles.logoWord}>STELLAR FARMERS MARKET</span>
           </div>
           <Separator orientation="vertical" className="h-6 bg-black/50" />
           <div className="text-sm text-white/80 hidden sm:block">{roomTitle}</div>
@@ -186,7 +170,7 @@ export default function Page() {
           <ChatPanel
             messages={messages}
             onSend={handleSend}
-            placeholder="Try /dance, /sit, /party, /wave, /laugh"
+            placeholder="Try /wave, /laugh, /sit - Chat with farmers!"
             maxLength={240}
           />
         </WindowFrame>
@@ -195,7 +179,7 @@ export default function Page() {
       {navOpen && (
         <WindowFrame
           id="navigator"
-          title="Plaza Navigator"
+          title="Market Navigator"
           variant="habbo"
           initial={{ x: 400, y: 88, w: 360, h: 420 }}
           onClose={() => setNavOpen(false)}
@@ -206,12 +190,12 @@ export default function Page() {
               <div className={styles.tabActive}>Public Spaces</div>
               <div className={styles.tab}>Guest Rooms</div>
             </div>
-            <div className="px-3 py-2 text-[12px] text-black/80">Public Rooms</div>
+            <div className="px-3 py-2 text-[12px] text-black/80">Market Areas</div>
             <div className="px-3 pb-3 space-y-2">
               {[
-                { label: "GPT-5 Launch Party 🥳", value: "Lobby" as RoomPreset },
-                { label: "Cafés", value: "Café" as RoomPreset },
-                { label: "Rooftop", value: "Rooftop" as RoomPreset },
+                { label: "Main Market 🌾", value: "Lobby" as RoomPreset },
+                { label: "Produce Stall 🥕", value: "Café" as RoomPreset },
+                { label: "Trading Floor 📊", value: "Rooftop" as RoomPreset },
               ].map((r) => (
                 <div key={r.label} className={styles.navRow}>
                   <div className={styles.navDot} />
@@ -226,7 +210,7 @@ export default function Page() {
               ))}
             </div>
             <div className="mt-auto border-t border-black/20 text-[11px] text-black/70 px-3 py-2">
-              Tip: Click tiles or hold WASD/Arrows to walk. Emotes: /dance, /sit, /party, /wave, /laugh. Click a music box to play tunes locally.
+              Tip: Click tiles or hold WASD/Arrows to walk. Emotes: /wave, /laugh, /sit. Trade with other farmers!
             </div>
           </div>
         </WindowFrame>

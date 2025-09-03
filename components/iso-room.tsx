@@ -6,7 +6,7 @@ import { aStar } from "@/lib/pathfinding"
 import { palette } from "@/lib/palette"
 import type { ChatMessage, Facing } from "@/hooks/use-multiplayer"
 
-export type RoomPreset = "Lobby" | "Café" | "Rooftop"
+export type RoomPreset = "Lobby" | "Café" | "Rooftop" // Lobby=Main Market, Café=Produce Stall, Rooftop=Trading Floor
 
 type Grid = { cols: number; rows: number; walkable: boolean[] }
 function idx(x: number, y: number, cols: number) { return y * cols + x }
@@ -592,37 +592,11 @@ function drawFurniture(
       const { px, py } = projectIso(x, y, params)
       drawRaisedBlock(ctx, px, py, tileW, tileH, color, "#000", shade(color, -20))
     }
-    const rug = (x: number, y: number, wTiles: number, hTiles: number, color = "#fde68a") => {
-      const tl = projectIso(x, y, params)
-      const br = projectIso(x + wTiles, y + hTiles, params)
-      const cx = (tl.px + br.px) / 2
-      const cy = (tl.py + br.py) / 2
-      ctx.save()
-      ctx.fillStyle = color
-      ctx.beginPath()
-      ctx.ellipse(cx, cy - 6, (tileW * wTiles * 0.32), (tileH * hTiles * 0.7), 0, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.strokeStyle = "#000"
-      ctx.stroke()
-      ctx.restore()
-    }
-    const arcade = (x: number, y: number) => {
+    // Basic crop plot
+    const cropPlot = (x: number, y: number, crop = "#22c55e") => {
       const { px, py } = projectIso(x, y, params)
-      rect(ctx, px - 10, py - 22, 20, 22, "#1f2937")
-      rect(ctx, px - 12, py - 30, 24, 10, "#111827")
-      rect(ctx, px - 9, py - 26, 18, 12, "#0ea5e9")
-    }
-    const discoTile = (x: number, y: number, phase: number) => {
-      const { px, py } = projectIso(x, y, params)
-      const colors = ["#fca5a5", "#fde68a", "#86efac", "#93c5fd", "#c4b5fd"]
-      const c = colors[((x + y + Math.floor(phase)) % colors.length + colors.length) % colors.length]
-      drawTile(ctx, px, py, tileW, tileH, c, "#000")
-    }
-    const poolWater = (x: number, y: number, shimmer: number) => {
-      const { px, py } = projectIso(x, y, params)
-      const base = "#8bd0ff"
-      const s = Math.round((Math.sin(shimmer + (x + y)) + 1) * 20)
-      drawTile(ctx, px, py, tileW, tileH, shade(base, s - 10), "#000")
+      drawTile(ctx, px, py, tileW, tileH, "#8b4513", "#000")
+      circle(ctx, px, py - 4, 3, crop)
     }
     const musicBox = (m: { id: "sunny" | "night"; x: number; y: number; label: string }) => {
       const { px, py } = projectIso(m.x, m.y, params)
@@ -763,26 +737,22 @@ function drawFurniture(
     }
 
     if (room === "Lobby") {
-      sofa(3, 4, "#ef4444"); sofa(15, 10, "#f59e0b"); palm(6, 3); palm(13, 12); roundTable(9, 5)
-      arcade(5, 9)
-      const phase = (t * (party ? 6 : 2)) % 100
-      for (let y = 7; y <= 9; y++) for (let x = 3; x <= 6; x++) discoTile(x, y, phase)
-      for (const m of opt.musicBoxes) musicBox(m)
-      discoBall(4.5, 8)
-      fountain(12, 5)
-      aquarium(6, 4)
-      bannerTop()
-      catNpc()
+      // Main Market - simple stands
+      marketStand(5, 4)
+      marketStand(12, 8)
+      cropPlot(7, 6)
+      cropPlot(9, 6)
+      cropPlot(11, 6)
     } else if (room === "Café") {
-      roundTable(5, 5); roundTable(14, 5); roundTable(10, 9); palm(3, 8); palm(16, 4)
-      const front = projectIso(2, 12, params)
-      ctx.fillStyle = "#8b5cf6"; ctx.fillRect(front.px - 60, front.py + 10, 120, 4); ctx.strokeStyle = "#000"; ctx.strokeRect(front.px - 60 + 0.5, front.py + 10 + 0.5, 120, 4)
-      for (const m of opt.musicBoxes) musicBox(m)
+      // Produce Stall
+      marketStand(8, 5)
+      cropPlot(6, 7, "#ef4444") // tomatoes
+      cropPlot(10, 7, "#22c55e") // lettuce
     } else {
-      palm(6, 12); palm(12, 12); roundTable(8, 7)
-      for (let y = 7; y <= 9; y++) for (let x = 8; x <= 11; x++) poolWater(x, y, t * 2)
-      rug(7, 11, 4, 2, "#bfdbfe")
-      for (const m of opt.musicBoxes) musicBox(m)
+      // Trading Floor  
+      marketStand(9, 8)
+      cropPlot(7, 10)
+      cropPlot(11, 10)
     }
   }
 
@@ -886,25 +856,7 @@ function drawFurniture(
     }
   }
 
-  function updateConfetti(arr: { x: number; y: number; c: string; vy: number }[], party: boolean, w: number, h: number) {
-    if (party) {
-      for (let i = 0; i < 6; i++) {
-        arr.push({ x: Math.random() * w, y: -10, c: ["#ef4444","#f59e0b","#10b981","#3b82f6","#8b5cf6","#ec4899"][Math.floor(Math.random()*6)], vy: 40 + Math.random() * 40 })
-      }
-    }
-    for (let i = arr.length - 1; i >= 0; i--) {
-      arr[i].y += arr[i].vy * (1 / 60)
-      arr[i].vy += 20 * (1 / 60)
-      if (arr[i].y > h + 20) arr.splice(i, 1)
-    }
-  }
 
-  function drawConfetti(ctx: CanvasRenderingContext2D, arr: { x: number; y: number; c: string }[]) {
-    for (const p of arr) {
-      ctx.fillStyle = p.c
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 4, 4)
-    }
-  }
 
 function rect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: string) {
   ctx.fillStyle = fill; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
