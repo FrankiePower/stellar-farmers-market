@@ -2,8 +2,8 @@
   position: fixed;
   border: 2px solid #000;
   border-radius: 10px;
-  background: #d9e6ef;
-  box-shadow: 0 4px 0 #00000040, 0 0 0 2px #3b5f76 inset;
+  background: #dad7cd;
+  box-shadow: 0 4px 0 #00000040, 0 0 0 2px #588157 inset;
   overflow: hidden;
 }
 
@@ -13,16 +13,16 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 8px;
-  color: #0b2a3a;
+  color: #344e41;
   border-bottom: 2px solid #000;
-  background: linear-gradient(180deg, #b6d5e9 0%, #6fa6c3 100%);
+  background: linear-gradient(180deg, #a3b18a 0%, #588157 100%);
 }
 
 .title {
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.3px;
-  text-shadow: 0 1px #e6f3fa;
+  text-shadow: 0 1px #e0ebcd;
 }
 
 .closeBtn {
@@ -39,8 +39,8 @@
 }
 .closeIcon::before { transform: rotate(45deg); } .closeIcon::after { transform: rotate(-45deg); }
 
-.windowInner { height: calc(100% - 40px); background: #eef6fb; border-top: 2px solid #3b5f76; }
-.windowBody { display: flex; flex-direction: column; height: 100%; background: #eef6fb; }
+.windowInner { height: calc(100% - 40px); background: #f0efeb; border-top: 2px solid #588157; }
+.windowBody { display: flex; flex-direction: column; height: 100%; background: #f0efeb; }
 
 .logoBlock {
   display: inline-flex; align-items: center; justify-content: center;
@@ -49,7 +49,7 @@
 }
 .logoWord { font-weight: 900; letter-spacing: 0.5px; color: #000; text-shadow: 1px 1px #ffe680; font-size: 13px; }
 
-.playFrame { border: 2px solid #000; border-radius: 10px; background: #c6d9e6; box-shadow: 0 4px 0 #00000040, inset 0 0 0 2px #3b5f76; overflow: hidden; }
+.playFrame { border: 2px solid #000; border-radius: 10px; background: #c6d4b9; box-shadow: 0 4px 0 #00000040, inset 0 0 0 2px #588157; overflow: hidden; }
 
 .pixelButton {
   border: 2px solid #000 !important;
@@ -59,21 +59,21 @@
 }
 .pixelButton:disabled { opacity: 0.6; }
 
-.pixelInput { border: 2px solid #000 !important; box-shadow: inset 0 0 0 2px #6fa6c3 !important; background: #fff !important; }
+.pixelInput { border: 2px solid #000 !important; box-shadow: inset 0 0 0 2px #588157 !important; background: #fff !important; }
 
-.tabBar { display: flex; gap: 2px; padding: 6px 6px 0 6px; border-bottom: 2px solid #3b5f76; background: linear-gradient(180deg, #b6d5e9 0%, #6fa6c3 100%); }
+.tabBar { display: flex; gap: 2px; padding: 6px 6px 0 6px; border-bottom: 2px solid #588157; background: linear-gradient(180deg, #a3b18a 0%, #588157 100%); }
 .tab, .tabActive {
   padding: 6px 10px; border: 2px solid #000; border-bottom-width: 0; border-top-left-radius: 8px; border-top-right-radius: 8px;
-  background: #9ec3d8; font-size: 12px; font-weight: 700;
+  background: #8fad7a; font-size: 12px; font-weight: 700;
 }
-.tabActive { background: #eef6fb; }
+.tabActive { background: #f0efeb; }
 
 .navRow {
   display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 2px solid #000; border-radius: 8px;
-  background: linear-gradient(#d7f5dd, #b6eec3); box-shadow: inset 0 0 0 2px #3aa86b;
+  background: linear-gradient(#e8f1dd, #c4d9b6); box-shadow: inset 0 0 0 2px #588157;
 }
-.navDot { width: 10px; height: 10px; background: #16a34a; border: 2px solid #000; border-radius: 9999px; }
-.statusPill { font-size: 11px; padding: 2px 8px; border: 2px solid #000; border-radius: 9999px; background: #22c55e; color: #072f14; }
+.navDot { width: 10px; height: 10px; background: #588157; border: 2px solid #000; border-radius: 9999px; }
+.statusPill { font-size: 11px; padding: 2px 8px; border: 2px solid #000; border-radius: 9999px; background: #52b788; color: #1a3725; }
 .goButton {
   border: 2px solid #000 !important; background: linear-gradient(#ffb84d, #f97316) !important; color: #1f1300 !important;
   padding: 0 10px !important; height: 28px !important; box-shadow: inset 0 0 0 2px #a04f06 !important;
