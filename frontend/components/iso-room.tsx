@@ -58,6 +58,7 @@ type Props = {
   laughing?: boolean
   sitToggleSeq?: number
   onSitChange?: (v: boolean) => void
+  onStallClick?: (stallId: string, stallType: string) => void
 }
 
 type Avatar = { x: number; y: number; facing: "N" | "S" | "E" | "W" }
@@ -74,6 +75,7 @@ export default function IsoRoom({
   laughing = false,
   sitToggleSeq = 0,
   onSitChange,
+  onStallClick,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -93,6 +95,7 @@ export default function IsoRoom({
   const [hoverId, setHoverId] = useState<string | null>(null)
   const hoverTargetsRef = useRef<{ id: string; name: string; x: number; yHead: number }[]>([])
 
+  const stallsRef = useRef<{ id: string; type: string; x: number; y: number; px: number; py: number; width: number; height: number }[]>([])
 
   const smoothPeersRef = useRef<Map<string, { x: number; y: number; facing: Facing }>>(new Map())
   const authorBubblesRef = useRef<Map<string, Bubble>>(new Map())
@@ -222,6 +225,36 @@ export default function IsoRoom({
     const px = e.clientX - rect.left
     const py = e.clientY - rect.top
 
+    // Check if click is on a stall
+    const stalls = stallsRef.current
+    for (const stall of stalls) {
+      if (px >= stall.px - stall.width/2 && px <= stall.px + stall.width/2 &&
+          py >= stall.py - stall.height && py <= stall.py) {
+        // Move avatar to stall position first
+        const sx = Math.round(avatar.x)
+        const sy = Math.round(avatar.y)
+        const path = aStar(
+          { x: sx, y: sy },
+          { x: stall.x, y: stall.y },
+          grid.cols, grid.rows,
+          (x, y) => grid.walkable[idx(x, y, grid.cols)]
+        )
+        if (path.length > 1) {
+          pathRef.current = { nodes: path, progress: 0 }
+          const first = path[1]
+          const dx = first.x - sx
+          const dy = first.y - sy
+          const facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "E" : "W") : dy > 0 ? "S" : "N"
+          setAvatar((a) => ({ ...a, facing }))
+          
+          // Trigger stall interaction after a delay (when avatar reaches stall)
+          setTimeout(() => {
+            onStallClick?.(stall.id, stall.type)
+          }, (path.length / 3.4) * 1000) // Calculate time based on movement speed
+        }
+        return
+      }
+    }
 
     const originInfo = computeCenteredOrigin(size.w, size.h, grid.cols, grid.rows, tileW, tileH)
     const params: IsoProjectParams = { tileW, tileH, originX: originInfo.x, originY: originInfo.y }
@@ -253,7 +286,7 @@ export default function IsoRoom({
       const facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "E" : "W") : dy > 0 ? "S" : "N"
       setAvatar((a) => ({ ...a, facing }))
     }
-  }, [avatar.x, avatar.y, grid, isSitting, onSitChange, size.w, tileH, tileW, room])
+  }, [avatar.x, avatar.y, grid, isSitting, onSitChange, size.w, tileH, tileW, room, onStallClick])
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -370,7 +403,7 @@ export default function IsoRoom({
       }
 
       drawWalls(ctx, grid, params, tileW, tileH)
-      drawFurniture(ctx, room, params, tileW, tileH, animRef.current)
+      if (ctx) drawFurniture(ctx, room, params, tileW, tileH, animRef.current, stallsRef)
 
       const smoothMap = smoothPeersRef.current
       const peerBlend = clamp(dt * 8, 0, 1)
@@ -585,12 +618,28 @@ function drawFurniture(
   params: IsoProjectParams,
   tileW: number,
   tileH: number,
-  t: number
+  t: number,
+  stallsRef: React.MutableRefObject<{ id: string; type: string; x: number; y: number; px: number; py: number; width: number; height: number }[]>
 ) {
-    // Simple market stand
-    const marketStand = (x: number, y: number, color = "#8b4513") => {
+    // Clear stalls array at start of each frame
+    stallsRef.current = []
+    
+    // Simple market stand with click detection
+    const marketStand = (x: number, y: number, id: string, type: string, color = "#8b4513") => {
       const { px, py } = projectIso(x, y, params)
       drawRaisedBlock(ctx, px, py, tileW, tileH, color, "#000", shade(color, -20))
+      
+      // Register as clickable stall
+      stallsRef.current.push({
+        id,
+        type,
+        x,
+        y,
+        px,
+        py,
+        width: tileW,
+        height: tileH + 8 // Include raised block height
+      })
     }
     // Basic crop plot
     const cropPlot = (x: number, y: number, crop = "#22c55e") => {
@@ -738,19 +787,19 @@ function drawFurniture(
 
     if (room === "Lobby") {
       // Main Market - simple stands
-      marketStand(5, 4)
-      marketStand(12, 8)
+      marketStand(5, 4, "prediction-stall", "prediction", "#7f5af0") // Purple for prediction market
+      marketStand(12, 8, "general-stall-1", "general", "#8b4513")
       cropPlot(7, 6)
       cropPlot(9, 6)
       cropPlot(11, 6)
     } else if (room === "Café") {
       // Produce Stall
-      marketStand(8, 5)
+      marketStand(8, 5, "produce-stall", "produce", "#22c55e")
       cropPlot(6, 7, "#ef4444") // tomatoes
       cropPlot(10, 7, "#22c55e") // lettuce
     } else {
       // Trading Floor  
-      marketStand(9, 8)
+      marketStand(9, 8, "trading-stall", "trading", "#f59e0b")
       cropPlot(7, 10)
       cropPlot(11, 10)
     }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { MessageSquare, Map, WifiOff } from 'lucide-react'
@@ -42,6 +43,7 @@ export default function Page() {
 
   const [uid, setUid] = useState("")
   const [displayName, setDisplayName] = useState("Guest")
+  const router = useRouter()
 
   // Offline mode: no Supabase env available on client
   const offlineMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -103,6 +105,24 @@ export default function Page() {
 
   const handleRoomChange = useCallback((next: RoomPreset) => setRoom(next), [])
 
+  const handleStallClick = useCallback((stallId: string, stallType: string) => {
+    console.log(`Clicked stall: ${stallId} (${stallType})`)
+    
+    if (stallType === "prediction") {
+      // Route to prediction markets page
+      router.push("/prediction-markets")
+    } else if (stallType === "produce") {
+      // Route to produce shop (placeholder)
+      router.push("/produce-shop")
+    } else if (stallType === "trading") {
+      // Route to trading floor (placeholder)  
+      router.push("/trading-floor")
+    } else {
+      // General stall - show closed message
+      alert(`This ${stallType} stall is currently closed. Come back later!`)
+    }
+  }, [router])
+
   const onlineCount = useMemo(() => (others ? others.length + 1 : 1), [others])
   const roomTitle = useMemo(() => `${room} — Online: ${onlineCount}`, [room, onlineCount])
 
@@ -145,6 +165,7 @@ export default function Page() {
                 laughing={selfLaugh}
                 sitToggleSeq={sitSeq}
                 onSitChange={(value) => setSit(value)}
+                onStallClick={handleStallClick}
               />
               {offlineMode && (
                 <div
