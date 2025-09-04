@@ -748,6 +748,18 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "ReflectorOracle"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "address": "CCYOZJCOPG34LLQQ7N24YXBM7LL62R7ONMZ3G6WZAAYPB5OYKOMJRN63"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "Resolver"
                             }
                           ]
