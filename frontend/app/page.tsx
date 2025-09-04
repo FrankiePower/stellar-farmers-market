@@ -7,6 +7,7 @@ import { MessageSquare, Map, WifiOff } from 'lucide-react'
 import IsoRoom, { type RoomPreset } from "@/components/iso-room"
 import ChatPanel from "@/components/chat-panel"
 import WindowFrame from "@/components/window-frame"
+import ConnectWallet from "@/components/ConnectWallet"
 import styles from "@/styles/habbo.module.css"
 import { useMultiplayer } from "@/hooks/use-multiplayer"
 
@@ -113,7 +114,7 @@ export default function Page() {
       <header className="border-b border-black/40 bg-[#344e41]">
         <div className="max-w-6xl mx-auto px-3 py-2 flex items-center gap-3">
           <div className={styles.logoBlock} aria-label="Pixel Plaza logo">
-            <span className={styles.logoWord}>STELLAR FARMERS MARKET</span>
+            <span className={styles.logoWord}>FARMERS MARKET</span>
           </div>
           <Separator orientation="vertical" className="h-6 bg-black/50" />
           <div className="text-sm text-white/80 hidden sm:block">{roomTitle}</div>
@@ -124,6 +125,7 @@ export default function Page() {
             <Button variant="outline" className={styles.pixelButton} onClick={() => setChatOpen((v) => !v)}>
               <MessageSquare className="w-4 h-4" /> Chat
             </Button>
+            <ConnectWallet />
           </div>
         </div>
       </header>
