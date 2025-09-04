@@ -1,8 +1,11 @@
 #![no_std]
 use soroban_sdk::{
     contract, contractimpl, contracttype, contracterror, contractclient,
-    symbol_short, Address, Env, String, token
+    symbol_short, Address, Env, String, Symbol, token
 };
+
+mod reflector;
+use reflector::{ReflectorClient, Asset as ReflectorAsset, PriceData};
 
 // -------------------------------
 // Errors
@@ -23,6 +26,7 @@ pub enum Error {
     InvalidAmount = 10,
     InvalidTime = 11,
     MarketNotFound = 12,
+    OraclePriceUnavailable = 13,
 }
 
 // -------------------------------
@@ -70,6 +74,7 @@ pub enum DataKey {
     NextMarketId,
     Market(u32),
     Stake(u32, Address), // (market_id, user)
+    ReflectorOracle, // Reflector oracle contract address
 }
 
 // -------------------------------
@@ -94,6 +99,9 @@ fn token_client<'a>(e: &'a Env, token: &'a Address) -> token::Client<'a> {
 // KALE SAC (Stellar Asset Contract) addresses
 const KALE_SAC_MAINNET: &str = "CB23WRDQWGSP6YPMY4UV5C4OW5CBTXKYN3XEATG7KJEZCXMJBYEHOUOV";
 const KALE_SAC_TESTNET: &str = "CAAVU2UQJLMZ3GUZFM56KVNHLPA3ZSSNR4VP2U53YBXFD2GI3QLIVHZZ";
+
+// Reflector Oracle address (Testnet CEX & DEX)
+const REFLECTOR_CEX_DEX_TESTNET: &str = "CCYOZJCOPG34LLQQ7N24YXBM7LL62R7ONMZ3G6WZAAYPB5OYKOMJRN63";
 
 // -------------------------------
 // Storage helpers
@@ -173,7 +181,7 @@ pub struct FarmersMarket;
 
 #[contractimpl]
 impl FarmersMarket {
-    /// Initialize the contract with KALE SAC address
+    /// Initialize the contract with KALE SAC address and Reflector oracle
     pub fn init(
         e: Env, 
         admin: Address, 
@@ -189,6 +197,11 @@ impl FarmersMarket {
         write_address(&e, DataKey::Admin, admin);
         write_address(&e, DataKey::Resolver, resolver);
         write_address(&e, DataKey::KaleToken, kale_sac_address);  // This is KALE's SAC address
+        
+        // Store Reflector oracle address
+        let oracle_addr = Address::from_string(&String::from_str(&e, REFLECTOR_CEX_DEX_TESTNET));
+        write_address(&e, DataKey::ReflectorOracle, oracle_addr);
+        
         write_u32(&e, DataKey::NextMarketId, 1);
         
         e.events().publish((symbol_short!("Init"),), true);
@@ -416,6 +429,102 @@ impl FarmersMarket {
     /// Helper to get KALE SAC address (for frontend)
     pub fn get_kale_sac_address(e: Env) -> Result<Address, Error> {
         read_address(&e, &DataKey::KaleToken)
+    }
+
+    // -------------------------------
+    // Reflector Oracle Integration 
+    // -------------------------------
+
+    /// Get current BTC price from Reflector oracle
+    pub fn get_btc_price(e: Env) -> Result<PriceData, Error> {
+        require_initialized(&e)?;
+        let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
+        let reflector_client = ReflectorClient::new(&e, &oracle_addr);
+        let btc_ticker = ReflectorAsset::Other(Symbol::new(&e, "BTC"));
+        
+        reflector_client.lastprice(&btc_ticker)
+            .ok_or(Error::OraclePriceUnavailable)
+    }
+
+    /// Get current ETH price from Reflector oracle
+    pub fn get_eth_price(e: Env) -> Result<PriceData, Error> {
+        require_initialized(&e)?;
+        let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
+        let reflector_client = ReflectorClient::new(&e, &oracle_addr);
+        let eth_ticker = ReflectorAsset::Other(Symbol::new(&e, "ETH"));
+        
+        reflector_client.lastprice(&eth_ticker)
+            .ok_or(Error::OraclePriceUnavailable)
+    }
+
+    /// Check if BTC price is above target (for market resolution)
+    pub fn is_btc_above_price(e: Env, target_price_usd: i128) -> Result<bool, Error> {
+        let btc_price = Self::get_btc_price(e)?;
+        // Reflector uses 14 decimals for USD prices
+        let target_with_decimals = target_price_usd * 100_000_000_000_000i128;
+        Ok(btc_price.price >= target_with_decimals)
+    }
+
+    /// Check if ETH price is above target (for market resolution)
+    pub fn is_eth_above_price(e: Env, target_price_usd: i128) -> Result<bool, Error> {
+        let eth_price = Self::get_eth_price(e)?;
+        // Reflector uses 14 decimals for USD prices
+        let target_with_decimals = target_price_usd * 100_000_000_000_000i128;
+        Ok(eth_price.price >= target_with_decimals)
+    }
+
+    /// Get ETH/BTC price ratio (cross-price functionality)
+    pub fn get_eth_btc_ratio(e: Env) -> Result<i128, Error> {
+        require_initialized(&e)?;
+        let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
+        let reflector_client = ReflectorClient::new(&e, &oracle_addr);
+        
+        let eth_ticker = ReflectorAsset::Other(Symbol::new(&e, "ETH"));
+        let btc_ticker = ReflectorAsset::Other(Symbol::new(&e, "BTC"));
+        
+        // Use Reflector's cross-price functionality
+        let cross_price = reflector_client.x_last_price(&eth_ticker, &btc_ticker)
+            .ok_or(Error::OraclePriceUnavailable)?;
+            
+        Ok(cross_price.price)
+    }
+
+    /// Get Time-Weighted Average Price for BTC (last 5 periods)
+    pub fn get_btc_twap(e: Env) -> Result<i128, Error> {
+        require_initialized(&e)?;
+        let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
+        let reflector_client = ReflectorClient::new(&e, &oracle_addr);
+        let btc_ticker = ReflectorAsset::Other(Symbol::new(&e, "BTC"));
+        
+        reflector_client.twap(&btc_ticker, &5)
+            .ok_or(Error::OraclePriceUnavailable)
+    }
+
+    /// Get oracle metadata (decimals, resolution, last update)
+    pub fn get_oracle_info(e: Env) -> Result<(u32, u32, u64), Error> {
+        require_initialized(&e)?;
+        let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
+        let reflector_client = ReflectorClient::new(&e, &oracle_addr);
+        
+        let decimals = reflector_client.decimals();
+        let resolution = reflector_client.resolution();
+        let last_timestamp = reflector_client.last_timestamp();
+        
+        Ok((decimals, resolution, last_timestamp))
+    }
+
+    /// Helper function to format price for display (converts from oracle decimals to readable USD)
+    pub fn format_price_to_usd(e: Env, oracle_price: i128) -> Result<i128, Error> {
+        let (decimals, _, _) = Self::get_oracle_info(e)?;
+        // Convert from oracle decimals (14) to 2 decimal places for USD display
+        let price_usd = oracle_price / 10i128.pow(decimals - 2);
+        Ok(price_usd)
+    }
+
+    /// Demo: Auto-resolve a "Will BTC reach $200k?" type market
+    pub fn demo_btc_200k_resolution(e: Env) -> Result<Outcome, Error> {
+        let is_above_200k = Self::is_btc_above_price(e, 200_000)?;
+        Ok(if is_above_200k { Outcome::Yes } else { Outcome::No })
     }
 }
 
