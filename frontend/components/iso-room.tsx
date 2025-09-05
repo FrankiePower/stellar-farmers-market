@@ -235,8 +235,8 @@ export default function IsoRoom({
     
     for (const stall of stalls) {
       const inX = px >= stall.px - stall.width/2 && px <= stall.px + stall.width/2
-      const inY = py >= stall.py - stall.height && py <= stall.py
-      console.log(`Checking stall ${stall.id}: inX=${inX}, inY=${inY}, bounds: x(${stall.px - stall.width/2} to ${stall.px + stall.width/2}), y(${stall.py - stall.height} to ${stall.py})`)
+      const inY = py >= stall.py - stall.height/2 && py <= stall.py + stall.height/2
+      console.log(`Checking stall ${stall.id}: inX=${inX}, inY=${inY}, bounds: x(${stall.px - stall.width/2} to ${stall.px + stall.width/2}), y(${stall.py - stall.height/2} to ${stall.py + stall.height/2})`)
       
       if (inX && inY) {
         console.log(`🎯 CLICKED ON STALL: ${stall.id} (${stall.type})`)
@@ -779,16 +779,16 @@ function drawFurniture(
       ctx.strokeText(label, px, py + 20)
       ctx.fillText(label, px, py + 20)
       
-      // Register as clickable area
+      // Register as clickable area - make it larger and better positioned
       stallsRef.current.push({
         id,
         type,
         x,
         y,
         px,
-        py,
-        width: 60, // Larger clickable area around icon
-        height: 60 // Larger clickable area around icon
+        py: py - 10, // Center the clickable area on the icon, not the ground
+        width: 80, // Even larger clickable area
+        height: 80 // Larger height to cover icon + text
       })
     }
     
