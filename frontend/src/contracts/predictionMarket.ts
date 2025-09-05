@@ -1,7 +1,7 @@
 "use client";
 
-import { Client, networks, type Market as ContractMarket, type Stake } from "../../packages/stellar_farmers_market/src/index";
-import { getPublicKey } from "@/src/stellar-wallets-kit";
+import { Client, networks, type Market as ContractMarket } from "../../packages/stellar_farmers_market/src/index";
+import { getPublicKey, signTransaction } from "@/src/stellar-wallets-kit";
 
 // UI-friendly Market type
 export interface Market {
@@ -33,6 +33,14 @@ class PredictionMarketClient {
       ...networks.testnet,
       rpcUrl: "https://soroban-testnet.stellar.org:443",
       allowHttp: false,
+      publicKey: async () => {
+        const address = await getPublicKey();
+        return address || "";
+      },
+      signTransaction: async (txXdr: string) => {
+        const result = await signTransaction(txXdr);
+        return result.signedTxXdr;
+      },
     });
   }
 
@@ -79,8 +87,9 @@ class PredictionMarketClient {
       for (let i = 1; i <= 5; i++) {
         try {
           const result = await this.client.get_market({ market_id: i });
-          if (result.result) {
-            markets.push(this.convertMarket(result.result, i));
+          const marketResult = await result.simulate();
+          if (marketResult.result && !marketResult.error) {
+            markets.push(this.convertMarket(marketResult.result, i));
           }
         } catch (error) {
           // Market doesn't exist, continue
@@ -146,8 +155,9 @@ class PredictionMarketClient {
   async getMarket(marketId: number): Promise<Market | null> {
     try {
       const result = await this.client.get_market({ market_id: marketId });
-      if (result.result) {
-        return this.convertMarket(result.result, marketId);
+      const marketResult = await result.simulate();
+      if (marketResult.result && !marketResult.error) {
+        return this.convertMarket(marketResult.result, marketId);
       }
       return null;
     } catch (error) {
@@ -167,23 +177,59 @@ class PredictionMarketClient {
       // Convert amount to stroops (7 decimal places)
       const amountStroops = Math.floor(parseFloat(amount) * 10000000);
       
-      const result = await this.client.bet({
+      // Set up the client for this user
+      this.client.options.publicKey = userAddress;
+      this.client.options.signTransaction = signTransaction;
+      
+      // Build and sign the transaction
+      const transaction = await this.client.bet({
         user: userAddress,
         market_id: marketId,
         side_yes: outcome === "Yes",
-        amount: amountStroops
+        amount: BigInt(amountStroops)
       });
 
-      if (result.result) {
-        return {
-          success: true,
-          hash: "transaction_hash_" + Date.now()
-        };
-      }
+      const { result } = await transaction.signAndSend();
       
-      throw new Error("Transaction failed");
+      return {
+        success: true,
+        hash: transaction.hash || "unknown"
+      };
     } catch (error) {
       console.error("Failed to place bet:", error);
+      throw error;
+    }
+  }
+
+  // Create a new market
+  async createMarket(question: string, closeTs: number, resolutionTs: number): Promise<any> {
+    try {
+      const userAddress = await getPublicKey();
+      if (!userAddress) throw new Error("Wallet not connected");
+
+      console.log(`Creating market: ${question}, close: ${closeTs}, resolution: ${resolutionTs}`);
+      
+      // Set up the client for this user
+      this.client.options.publicKey = userAddress;
+      this.client.options.signTransaction = signTransaction;
+      
+      // Build and sign the transaction
+      const transaction = await this.client.create_market({
+        creator: userAddress,
+        question: question,
+        close_ts: BigInt(closeTs),
+        resolution_ts: BigInt(resolutionTs)
+      });
+
+      const { result } = await transaction.signAndSend();
+      
+      return {
+        success: true,
+        marketId: result,
+        hash: transaction.hash || "unknown"
+      };
+    } catch (error) {
+      console.error("Failed to create market:", error);
       throw error;
     }
   }
@@ -197,19 +243,19 @@ class PredictionMarketClient {
       for (let i = 1; i <= 5; i++) {
         try {
           const result = await this.client.get_stake({ market_id: i, user: userAddress });
-          if (result && (result.yes > 0 || result.no > 0)) {
-            if (result.yes > 0) {
+          if (result && result.result && (result.result.yes > 0 || result.result.no > 0)) {
+            if (result.result.yes > 0) {
               stakes.push({
                 marketId: i,
                 outcome: "Yes",
-                amount: (Number(result.yes) / 10000000).toString()
+                amount: (Number(result.result.yes) / 10000000).toString()
               });
             }
-            if (result.no > 0) {
+            if (result.result.no > 0) {
               stakes.push({
                 marketId: i,
                 outcome: "No",
-                amount: (Number(result.no) / 10000000).toString()
+                amount: (Number(result.result.no) / 10000000).toString()
               });
             }
           }

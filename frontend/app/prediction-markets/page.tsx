@@ -2,11 +2,22 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus, Calendar, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import ConnectWallet from "@/components/ConnectWallet";
 import { predictionMarketClient, type Market } from "@/src/contracts/predictionMarket";
 import { getPublicKey } from "@/src/stellar-wallets-kit";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function PredictionMarketsPage() {
   const [filter, setFilter] = useState<"open" | "closed" | "all">("open");
@@ -14,6 +25,17 @@ export default function PredictionMarketsPage() {
   const [loading, setLoading] = useState(true);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const [bettingMarket, setBettingMarket] = useState<number | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  
+  // Market creation form state
+  const [marketForm, setMarketForm] = useState({
+    question: "",
+    closeDate: "",
+    closeTime: "",
+    resolutionDate: "",
+    resolutionTime: "",
+  });
 
   // Load markets from smart contract
   useEffect(() => {
@@ -91,6 +113,78 @@ export default function PredictionMarketsPage() {
       alert("Failed to place bet. Please try again.");
     } finally {
       setBettingMarket(null);
+    }
+  };
+
+  const handleCreateMarket = async () => {
+    try {
+      if (!userAddress) {
+        alert("Please connect your wallet first");
+        return;
+      }
+
+      // Validate form
+      if (!marketForm.question.trim()) {
+        alert("Please enter a market question");
+        return;
+      }
+      
+      if (!marketForm.closeDate || !marketForm.closeTime) {
+        alert("Please set a close date and time");
+        return;
+      }
+      
+      if (!marketForm.resolutionDate || !marketForm.resolutionTime) {
+        alert("Please set a resolution date and time");
+        return;
+      }
+
+      // Convert dates to timestamps
+      const closeDateTime = new Date(`${marketForm.closeDate}T${marketForm.closeTime}`);
+      const resolutionDateTime = new Date(`${marketForm.resolutionDate}T${marketForm.resolutionTime}`);
+      
+      // Validate dates
+      const now = new Date();
+      if (closeDateTime <= now) {
+        alert("Close date must be in the future");
+        return;
+      }
+      
+      if (resolutionDateTime <= closeDateTime) {
+        alert("Resolution date must be after the close date");
+        return;
+      }
+
+      setCreateLoading(true);
+      
+      const result = await predictionMarketClient.createMarket(
+        marketForm.question,
+        Math.floor(closeDateTime.getTime() / 1000),
+        Math.floor(resolutionDateTime.getTime() / 1000)
+      );
+
+      if (result) {
+        // Reset form and close modal
+        setMarketForm({
+          question: "",
+          closeDate: "",
+          closeTime: "",
+          resolutionDate: "",
+          resolutionTime: "",
+        });
+        setShowCreateModal(false);
+        
+        // Refresh markets
+        const updatedMarkets = await predictionMarketClient.getMarkets();
+        setMarkets(updatedMarkets);
+        
+        alert("Market created successfully!");
+      }
+    } catch (error) {
+      console.error("Failed to create market:", error);
+      alert("Failed to create market. Please try again.");
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -203,6 +297,15 @@ export default function PredictionMarketsPage() {
               All Markets
             </Button>
           </div>
+          
+          <Button
+            onClick={() => setShowCreateModal(true)}
+            disabled={!userAddress}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-emerald-600/50"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Market
+          </Button>
         </div>
 
         {/* Markets Grid */}
@@ -290,6 +393,118 @@ export default function PredictionMarketsPage() {
           )}
         </div>
       </div>
+
+      {/* Create Market Modal */}
+      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+        <DialogContent className="sm:max-w-[500px] bg-slate-900 border-green-700">
+          <DialogHeader>
+            <DialogTitle className="text-green-100">Create New Prediction Market</DialogTitle>
+            <DialogDescription className="text-green-200">
+              Set up a new market for users to predict and bet on outcomes.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="question" className="text-green-100">
+                Market Question
+              </Label>
+              <Textarea
+                id="question"
+                placeholder="e.g., Will Bitcoin reach $200,000 by December 2025?"
+                value={marketForm.question}
+                onChange={(e) => setMarketForm(prev => ({ ...prev, question: e.target.value }))}
+                className="bg-slate-800 border-green-700 text-green-100 placeholder:text-green-400"
+                rows={3}
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="close-date" className="text-green-100 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Close Date
+                </Label>
+                <Input
+                  id="close-date"
+                  type="date"
+                  value={marketForm.closeDate}
+                  onChange={(e) => setMarketForm(prev => ({ ...prev, closeDate: e.target.value }))}
+                  className="bg-slate-800 border-green-700 text-green-100"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="close-time" className="text-green-100 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Close Time
+                </Label>
+                <Input
+                  id="close-time"
+                  type="time"
+                  value={marketForm.closeTime}
+                  onChange={(e) => setMarketForm(prev => ({ ...prev, closeTime: e.target.value }))}
+                  className="bg-slate-800 border-green-700 text-green-100"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="resolution-date" className="text-green-100 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Resolution Date
+                </Label>
+                <Input
+                  id="resolution-date"
+                  type="date"
+                  value={marketForm.resolutionDate}
+                  onChange={(e) => setMarketForm(prev => ({ ...prev, resolutionDate: e.target.value }))}
+                  className="bg-slate-800 border-green-700 text-green-100"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="resolution-time" className="text-green-100 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Resolution Time
+                </Label>
+                <Input
+                  id="resolution-time"
+                  type="time"
+                  value={marketForm.resolutionTime}
+                  onChange={(e) => setMarketForm(prev => ({ ...prev, resolutionTime: e.target.value }))}
+                  className="bg-slate-800 border-green-700 text-green-100"
+                />
+              </div>
+            </div>
+            
+            <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 mt-2">
+              <p className="text-sm text-green-200">
+                📅 <strong>Close Date:</strong> When betting stops<br/>
+                🏁 <strong>Resolution Date:</strong> When the outcome is determined
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCreateModal(false)}
+              className="border-green-700 text-green-200 hover:bg-green-800"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateMarket}
+              disabled={createLoading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {createLoading ? "Creating..." : "Create Market"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
