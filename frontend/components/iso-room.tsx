@@ -236,20 +236,43 @@ export default function IsoRoom({
     for (const stall of stalls) {
       const inX = px >= stall.px - stall.width/2 && px <= stall.px + stall.width/2
       const inY = py >= stall.py - stall.height && py <= stall.py
-      console.log(`Checking stall ${stall.id}: inX=${inX}, inY=${inY}`)
+      console.log(`Checking stall ${stall.id}: inX=${inX}, inY=${inY}, bounds: x(${stall.px - stall.width/2} to ${stall.px + stall.width/2}), y(${stall.py - stall.height} to ${stall.py})`)
       
       if (inX && inY) {
-        console.log(`Clicked on stall: ${stall.id} (${stall.type})`)
+        console.log(`🎯 CLICKED ON STALL: ${stall.id} (${stall.type})`)
         
         // Move avatar to stall position first
         const sx = Math.round(avatar.x)
         const sy = Math.round(avatar.y)
+        
+        // Check if the stall position is walkable, if not find nearest walkable spot
+        let targetX = stall.x
+        let targetY = stall.y
+        
+        if (!grid.walkable[idx(targetX, targetY, grid.cols)]) {
+          // Find nearest walkable position around the stall
+          const offsets = [[0,1], [1,0], [0,-1], [-1,0], [1,1], [-1,-1], [1,-1], [-1,1]]
+          for (const [dx, dy] of offsets) {
+            const newX = stall.x + dx
+            const newY = stall.y + dy
+            if (newX >= 0 && newY >= 0 && newX < grid.cols && newY < grid.rows && 
+                grid.walkable[idx(newX, newY, grid.cols)]) {
+              targetX = newX
+              targetY = newY
+              break
+            }
+          }
+        }
+        
         const path = aStar(
           { x: sx, y: sy },
-          { x: stall.x, y: stall.y },
+          { x: targetX, y: targetY },
           grid.cols, grid.rows,
           (x, y) => grid.walkable[idx(x, y, grid.cols)]
         )
+        
+        console.log(`Path found: ${path.length} steps from (${sx},${sy}) to (${targetX},${targetY})`)
+        
         if (path.length > 1) {
           pathRef.current = { nodes: path, progress: 0 }
           const first = path[1]
@@ -260,7 +283,7 @@ export default function IsoRoom({
           
           // Show visit popup when avatar reaches the stall
           setTimeout(() => {
-            console.log(`Avatar reached stall: ${stall.id} (${stall.type})`)
+            console.log(`🚶 Avatar reached stall: ${stall.id} (${stall.type})`)
             
             // Get proper label based on stall ID
             const getStallLabel = (id: string) => {
@@ -287,8 +310,37 @@ export default function IsoRoom({
             }
             
             const label = getStallLabel(stall.id)
+            console.log(`🔮 Setting popup for ${label}`)
             setVisitPopup({ stallId: stall.id, stallType: stall.type, label })
           }, (path.length / 3.4) * 1000) // Calculate time based on movement speed
+        } else {
+          // No path found or already at location - show popup immediately
+          const getStallLabel = (id: string) => {
+            const labels: Record<string, string> = {
+              "prediction-stall": "Prediction Market",
+              "stake-stall": "KALE Staking",
+              "yield-stall": "KALE Yield Farm", 
+              "mall-stall": "KALE Mall",
+              "liquidity-stall": "KALE Liquidity",
+              "rewards-stall": "KALE Rewards",
+              "governance-stall": "KALE Governance",
+              "exchange-stall": "KALE Exchange",
+              "produce-stall": "Produce Shop",
+              "kale-cafe": "KALE Café",
+              "wellness-stall": "KALE Wellness",
+              "trading-stall": "Trading Floor",
+              "futures-stall": "KALE Futures",
+              "lending-stall": "KALE Lending",
+              "insurance-stall": "KALE Insurance",
+              "loans-stall": "KALE Loans",
+              "treasury-stall": "KALE Treasury"
+            }
+            return labels[id] || "KALE Service"
+          }
+          
+          const label = getStallLabel(stall.id)
+          console.log(`🔮 Direct popup for ${label} (no movement needed)`)
+          setVisitPopup({ stallId: stall.id, stallType: stall.type, label })
         }
         return
       }
