@@ -5,6 +5,8 @@ import { projectIso, unprojectIso, type IsoProjectParams } from "@/lib/iso"
 import { aStar } from "@/lib/pathfinding"
 import { palette } from "@/lib/palette"
 import type { ChatMessage, Facing } from "@/hooks/use-multiplayer"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 export type RoomPreset = "Lobby" | "Café" | "Rooftop" // Lobby=Main Market, Café=Produce Stall, Rooftop=Trading Floor
 
@@ -259,9 +261,32 @@ export default function IsoRoom({
           // Show visit popup when avatar reaches the stall
           setTimeout(() => {
             console.log(`Avatar reached stall: ${stall.id} (${stall.type})`)
-            const label = stall.type === "prediction" ? "Prediction Market" : 
-                         stall.type === "produce" ? "Produce Shop" :
-                         stall.type === "trading" ? "Trading Floor" : "Shop"
+            
+            // Get proper label based on stall ID
+            const getStallLabel = (id: string) => {
+              const labels: Record<string, string> = {
+                "prediction-stall": "Prediction Market",
+                "stake-stall": "KALE Staking",
+                "yield-stall": "KALE Yield Farm", 
+                "mall-stall": "KALE Mall",
+                "liquidity-stall": "KALE Liquidity",
+                "rewards-stall": "KALE Rewards",
+                "governance-stall": "KALE Governance",
+                "exchange-stall": "KALE Exchange",
+                "produce-stall": "Produce Shop",
+                "kale-cafe": "KALE Café",
+                "wellness-stall": "KALE Wellness",
+                "trading-stall": "Trading Floor",
+                "futures-stall": "KALE Futures",
+                "lending-stall": "KALE Lending",
+                "insurance-stall": "KALE Insurance",
+                "loans-stall": "KALE Loans",
+                "treasury-stall": "KALE Treasury"
+              }
+              return labels[id] || "KALE Service"
+            }
+            
+            const label = getStallLabel(stall.id)
             setVisitPopup({ stallId: stall.id, stallType: stall.type, label })
           }, (path.length / 3.4) * 1000) // Calculate time based on movement speed
         }
@@ -519,37 +544,43 @@ export default function IsoRoom({
         aria-label="Isometric room canvas"
       />
       
-      {/* Visit Popup */}
-      {visitPopup && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center shadow-xl">
-            <h3 className="text-xl font-bold mb-2">Visit {visitPopup.label}?</h3>
-            <p className="text-gray-600 mb-4">
-              {visitPopup.stallType === "prediction" ? "Enter the prediction markets to bet on future events!" :
-               visitPopup.stallType === "produce" ? "Browse fresh produce from local farmers." :
-               visitPopup.stallType === "trading" ? "Access agricultural trading and futures." :
-               "This shop is currently closed."}
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setVisitPopup(null)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
+      {/* Visit Dialog */}
+      <Dialog open={!!visitPopup} onOpenChange={(open) => !open && setVisitPopup(null)}>
+        <DialogContent className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-green-800 text-xl">
+              Visit {visitPopup?.label}?
+            </DialogTitle>
+            <DialogDescription className="text-green-700">
+              {visitPopup?.stallType === "prediction" ? "🔮 Enter the prediction markets to bet on future events with KALE tokens!" :
+               visitPopup?.stallType === "produce" ? "🥕 Browse fresh organic produce from local farmers." :
+               visitPopup?.stallType === "trading" ? "📈 Access KALE trading, futures, and DeFi services." :
+               visitPopup?.stallType === "general" ? `🥬 Explore KALE-powered services and earn rewards!` :
+               "This area offers KALE token utility and farming opportunities."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-3 justify-center">
+            <Button
+              variant="outline"
+              onClick={() => setVisitPopup(null)}
+              className="border-green-300 text-green-700 hover:bg-green-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (visitPopup) {
                   setVisitPopup(null)
                   onStallClick?.(visitPopup.stallId, visitPopup.stallType)
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              >
-                Visit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                }
+              }}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              Visit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -831,9 +862,9 @@ function drawFurniture(
       rect(ctx, fx + 3, fy - 1, 3, 2, "#f59e0b")
     }
 
-    const bannerTop = () => {
+    const bannerTop = (gridCols: number) => {
       // A banner centered on the top wall around (cols/2, 1)
-      const mid = projectIso(Math.floor(grid.cols / 2), 1, params)
+      const mid = projectIso(Math.floor(gridCols / 2), 1, params)
       rect(ctx, mid.px - 32, mid.py - 42, 64, 12, "#22c55e")
     }
 
@@ -859,25 +890,48 @@ function drawFurniture(
     }
 
     if (room === "Lobby") {
-      // Main Market - clickable icons and decorative stalls
-      marketIcon(5, 4, "prediction-stall", "prediction", "PREDICT", "🔮")
-      marketIcon(12, 8, "general-stall-1", "general", "SHOP", "🏪")
-      marketStand(15, 11, "#8b4513") // Decorative stall
-      cropPlot(7, 6)
-      cropPlot(9, 6)
-      cropPlot(11, 6)
+      // Main Market - KALE-focused activities
+      marketIcon(3, 4, "prediction-stall", "prediction", "PREDICT", "🔮") // Corner spot
+      marketIcon(7, 2, "stake-stall", "general", "STAKE", "🥬") // Stake KALE tokens
+      marketIcon(14, 3, "yield-stall", "general", "YIELD FARM", "🌾") // KALE yield farming
+      marketIcon(9, 8, "mall-stall", "general", "KALE MALL", "🏬") // Central shopping with KALE
+      
+      marketIcon(2, 9, "liquidity-stall", "general", "LIQUIDITY", "💧") // KALE liquidity pools
+      marketIcon(6, 12, "rewards-stall", "general", "REWARDS", "🎁") // KALE rewards program
+      marketIcon(12, 7, "governance-stall", "general", "VOTE", "🗳️") // KALE governance
+      marketIcon(16, 11, "exchange-stall", "general", "EXCHANGE", "🔄") // KALE token exchange
+      
+      // KALE-themed crop displays  
+      cropPlot(4, 10, "#22c55e") // KALE patch
+      cropPlot(10, 4, "#ef4444") // tomato patch  
+      cropPlot(8, 13, "#f59e0b") // corn patch
+      cropPlot(15, 8, "#9333ea") // purple kale
     } else if (room === "Café") {
-      // Produce area
-      marketIcon(8, 5, "produce-stall", "produce", "PRODUCE", "🥕")
-      marketStand(14, 8, "#22c55e") // Decorative stall
-      cropPlot(6, 7, "#ef4444") // tomatoes
-      cropPlot(10, 7, "#22c55e") // lettuce
+      // Produce area - KALE dining & wellness
+      marketIcon(5, 3, "produce-stall", "produce", "PRODUCE", "🥕") // Fresh produce
+      marketIcon(12, 5, "kale-cafe", "general", "KALE CAFÉ", "☕") // KALE smoothies & health foods
+      marketIcon(16, 8, "wellness-stall", "general", "WELLNESS", "🧘") // KALE health benefits
+      
+      // Organic displays with KALE focus
+      cropPlot(3, 8, "#22c55e") // Fresh KALE
+      cropPlot(8, 7, "#22c55e") // Baby KALE  
+      cropPlot(10, 11, "#9333ea") // Purple KALE
+      cropPlot(14, 12, "#f59e0b") // Golden KALE
+      cropPlot(6, 13, "#16a34a") // Curly KALE
     } else {
-      // Trading Floor  
-      marketIcon(9, 8, "trading-stall", "trading", "TRADING", "📈")
-      marketStand(14, 10, "#f59e0b") // Decorative stall
-      cropPlot(7, 10)
-      cropPlot(11, 10)
+      // Trading Floor - KALE DeFi services
+      marketIcon(6, 4, "trading-stall", "trading", "TRADING", "📈") // Central
+      marketIcon(13, 3, "futures-stall", "trading", "KALE FUTURES", "📊") // KALE futures
+      marketIcon(17, 7, "lending-stall", "general", "KALE LENDING", "🏦") // KALE lending
+      
+      marketIcon(3, 10, "insurance-stall", "general", "KALE INSURANCE", "🛡️") // KALE insurance
+      marketIcon(8, 13, "loans-stall", "general", "KALE LOANS", "💰") // KALE-backed loans
+      marketIcon(15, 12, "treasury-stall", "general", "TREASURY", "🏛️") // KALE treasury
+      
+      // KALE market data displays
+      cropPlot(5, 8) // KALE price terminal
+      cropPlot(11, 9) // KALE analytics
+      cropPlot(14, 5) // KALE metrics
     }
   }
 
@@ -1055,7 +1109,7 @@ function drawBubble(ctx: CanvasRenderingContext2D, x: number, y: number, text: s
   ctx.fillStyle = "#111827"
   ctx.fillText(text, Math.round(x - w / 2 + padding), Math.round(y - h - 8 + 14))
 }
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: boolean, stroke: boolean) {
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number, fill: boolean = false, stroke: boolean = false) {
   const r = Math.min(radius, width / 2, height / 2)
   ctx.beginPath()
   ctx.moveTo(x + r, y)
