@@ -95,6 +95,7 @@ export default function IsoRoom({
   const [hoverId, setHoverId] = useState<string | null>(null)
   const hoverTargetsRef = useRef<{ id: string; name: string; x: number; yHead: number }[]>([])
 
+  const [visitPopup, setVisitPopup] = useState<{ stallId: string; stallType: string; label: string } | null>(null)
   const stallsRef = useRef<{ id: string; type: string; x: number; y: number; px: number; py: number; width: number; height: number }[]>([])
 
   const smoothPeersRef = useRef<Map<string, { x: number; y: number; facing: Facing }>>(new Map())
@@ -227,9 +228,17 @@ export default function IsoRoom({
 
     // Check if click is on a stall
     const stalls = stallsRef.current
+    console.log(`Click at px: ${px}, py: ${py}`)
+    console.log(`Available stalls:`, stalls)
+    
     for (const stall of stalls) {
-      if (px >= stall.px - stall.width/2 && px <= stall.px + stall.width/2 &&
-          py >= stall.py - stall.height && py <= stall.py) {
+      const inX = px >= stall.px - stall.width/2 && px <= stall.px + stall.width/2
+      const inY = py >= stall.py - stall.height && py <= stall.py
+      console.log(`Checking stall ${stall.id}: inX=${inX}, inY=${inY}`)
+      
+      if (inX && inY) {
+        console.log(`Clicked on stall: ${stall.id} (${stall.type})`)
+        
         // Move avatar to stall position first
         const sx = Math.round(avatar.x)
         const sy = Math.round(avatar.y)
@@ -247,9 +256,13 @@ export default function IsoRoom({
           const facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "E" : "W") : dy > 0 ? "S" : "N"
           setAvatar((a) => ({ ...a, facing }))
           
-          // Trigger stall interaction after a delay (when avatar reaches stall)
+          // Show visit popup when avatar reaches the stall
           setTimeout(() => {
-            onStallClick?.(stall.id, stall.type)
+            console.log(`Avatar reached stall: ${stall.id} (${stall.type})`)
+            const label = stall.type === "prediction" ? "Prediction Market" : 
+                         stall.type === "produce" ? "Produce Shop" :
+                         stall.type === "trading" ? "Trading Floor" : "Shop"
+            setVisitPopup({ stallId: stall.id, stallType: stall.type, label })
           }, (path.length / 3.4) * 1000) // Calculate time based on movement speed
         }
         return
@@ -384,9 +397,11 @@ export default function IsoRoom({
       ctx.imageSmoothingEnabled = false
 
       // background (constant speed, softer clouds without borders)
-      drawSky(ctx, size.w, size.h, bgTimeRef.current)
-      drawCloudsBack(ctx, size.w, bgTimeRef.current)
-      drawBirds(ctx, size.w, size.h, bgTimeRef.current)
+      if (ctx) {
+        drawSky(ctx, size.w, size.h, bgTimeRef.current)
+        drawCloudsBack(ctx, size.w, bgTimeRef.current)
+        drawBirds(ctx, size.w, size.h, bgTimeRef.current)
+      }
 
       const originInfo = computeCenteredOrigin(size.w, size.h, grid.cols, grid.rows, tileW, tileH)
       const params: IsoProjectParams = { tileW, tileH, originX: originInfo.x, originY: originInfo.y }
@@ -402,8 +417,10 @@ export default function IsoRoom({
         }
       }
 
-      drawWalls(ctx, grid, params, tileW, tileH)
-      if (ctx) drawFurniture(ctx, room, params, tileW, tileH, animRef.current, stallsRef)
+      if (ctx) {
+        drawWalls(ctx, grid, params, tileW, tileH)
+        drawFurniture(ctx, room, params, tileW, tileH, animRef.current, stallsRef)
+      }
 
       const smoothMap = smoothPeersRef.current
       const peerBlend = clamp(dt * 8, 0, 1)
@@ -421,39 +438,41 @@ export default function IsoRoom({
       const peersSmoothed = peers.map((p) => ({ p, s: smoothMap.get(p.id) ?? p }))
       const peersSorted = peersSmoothed.sort((a, b) => (a.s.y - b.s.y))
       const labels: { id: string; text: string; x: number; yHead: number }[] = []
-      for (const { p, s } of peersSorted) {
-        const { px: pX, py: pY } = projectIso(s.x, s.y, params)
-        drawAvatar(ctx, pX, pY, tileW, tileH, s.facing, animRef.current, false, p.color, false, !!p.sit, !!p.wave, !!p.laugh)
-        const headY = pY - 26
-        labels.push({ id: p.id, text: p.name || "Guest", x: pX, yHead: headY })
+      if (ctx) {
+        for (const { p, s } of peersSorted) {
+          const { px: pX, py: pY } = projectIso(s.x, s.y, params)
+          drawAvatar(ctx, pX, pY, tileW, tileH, s.facing, animRef.current, false, p.color, false, !!p.sit, !!p.wave, !!p.laugh)
+          const headY = pY - 26
+          labels.push({ id: p.id, text: p.name || "Guest", x: pX, yHead: headY })
 
-        const b = authorBubblesRef.current.get(p.name)
-        if (b && b.expiresAt > Date.now()) {
-          drawBubble(ctx, pX, pY - 28 + (p.sit ? -6 : 0), b.text)
+          const b = authorBubblesRef.current.get(p.name)
+          if (b && b.expiresAt > Date.now()) {
+            drawBubble(ctx, pX, pY - 28 + (p.sit ? -6 : 0), b.text)
+          }
         }
-      }
 
-      const { px: ax, py: ay } = projectIso(avatar.x, avatar.y, params)
-      const walkingOrHeld = !isSitting && (!!heldDirRef.current || moving)
-      const bob = Math.sin(animRef.current * 2.2) * (walkingOrHeld ? 1.5 : 0.6)
-      drawAvatar(ctx, ax, ay + (isSitting ? 0 : bob), tileW, tileH, avatar.facing, animRef.current, walkingOrHeld, undefined, false, isSitting, waving, laughing)
-      const selfHeadY = (ay + (isSitting ? 0 : bob)) - 26
-      labels.push({ id: "self", text: selfName, x: ax, yHead: selfHeadY })
+        const { px: ax, py: ay } = projectIso(avatar.x, avatar.y, params)
+        const walkingOrHeld = !isSitting && (!!heldDirRef.current || moving)
+        const bob = Math.sin(animRef.current * 2.2) * (walkingOrHeld ? 1.5 : 0.6)
+        drawAvatar(ctx, ax, ay + (isSitting ? 0 : bob), tileW, tileH, avatar.facing, animRef.current, walkingOrHeld, undefined, false, isSitting, waving, laughing)
+        const selfHeadY = (ay + (isSitting ? 0 : bob)) - 26
+        labels.push({ id: "self", text: selfName, x: ax, yHead: selfHeadY })
 
-      const myBubble = authorBubblesRef.current.get(selfName)
-      if (myBubble && myBubble.expiresAt > Date.now()) {
-        drawBubble(ctx, ax, ay - 28 + (isSitting ? -6 : bob), myBubble.text)
-      }
+        const myBubble = authorBubblesRef.current.get(selfName)
+        if (myBubble && myBubble.expiresAt > Date.now()) {
+          drawBubble(ctx, ax, ay - 28 + (isSitting ? -6 : bob), myBubble.text)
+        }
 
-      if (bubbleRef.current && bubbleRef.current.expiresAt > Date.now()) {
-        drawBubble(ctx, ax, ay - 28 + (isSitting ? -6 : bob), bubbleRef.current.text)
-      }
+        if (bubbleRef.current && bubbleRef.current.expiresAt > Date.now()) {
+          drawBubble(ctx, ax, ay - 28 + (isSitting ? -6 : bob), bubbleRef.current.text)
+        }
 
-      drawCloudsFront(ctx, size.w, size.h, bgTimeRef.current)
+        drawCloudsFront(ctx, size.w, size.h, bgTimeRef.current)
 
-      if (hoverId) {
-        const hovered = labels.find(l => l.id === hoverId)
-        if (hovered) drawNameplates(ctx, [hovered])
+        if (hoverId) {
+          const hovered = labels.find(l => l.id === hoverId)
+          if (hovered) drawNameplates(ctx, [hovered])
+        }
       }
       hoverTargetsRef.current = labels.map(l => ({ id: l.id, name: l.text, x: l.x, yHead: l.yHead }))
 
@@ -499,6 +518,38 @@ export default function IsoRoom({
         className="block w-full h-full cursor-pointer touch-none"
         aria-label="Isometric room canvas"
       />
+      
+      {/* Visit Popup */}
+      {visitPopup && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm mx-4 text-center shadow-xl">
+            <h3 className="text-xl font-bold mb-2">Visit {visitPopup.label}?</h3>
+            <p className="text-gray-600 mb-4">
+              {visitPopup.stallType === "prediction" ? "Enter the prediction markets to bet on future events!" :
+               visitPopup.stallType === "produce" ? "Browse fresh produce from local farmers." :
+               visitPopup.stallType === "trading" ? "Access agricultural trading and futures." :
+               "This shop is currently closed."}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setVisitPopup(null)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setVisitPopup(null)
+                  onStallClick?.(visitPopup.stallId, visitPopup.stallType)
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+              >
+                Visit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -624,12 +675,28 @@ function drawFurniture(
     // Clear stalls array at start of each frame
     stallsRef.current = []
     
-    // Simple market stand with click detection
-    const marketStand = (x: number, y: number, id: string, type: string, color = "#8b4513") => {
+    // Large clickable icon (no stall structure)
+    const marketIcon = (x: number, y: number, id: string, type: string, label: string, icon: string) => {
       const { px, py } = projectIso(x, y, params)
-      drawRaisedBlock(ctx, px, py, tileW, tileH, color, "#000", shade(color, -20))
       
-      // Register as clickable stall
+      // Large icon
+      ctx.font = "48px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
+      ctx.fillStyle = "#fff"
+      ctx.strokeStyle = "#000"
+      ctx.lineWidth = 2
+      ctx.textAlign = "center"
+      ctx.strokeText(icon, px, py - 10)
+      ctx.fillText(icon, px, py - 10)
+      
+      // Small label below icon
+      ctx.font = "700 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
+      ctx.fillStyle = "#000"
+      ctx.strokeStyle = "#fff"
+      ctx.lineWidth = 2
+      ctx.strokeText(label, px, py + 20)
+      ctx.fillText(label, px, py + 20)
+      
+      // Register as clickable area
       stallsRef.current.push({
         id,
         type,
@@ -637,9 +704,15 @@ function drawFurniture(
         y,
         px,
         py,
-        width: tileW,
-        height: tileH + 8 // Include raised block height
+        width: 60, // Larger clickable area around icon
+        height: 60 // Larger clickable area around icon
       })
+    }
+    
+    // Regular market stand (for non-interactive stalls)
+    const marketStand = (x: number, y: number, color = "#8b4513") => {
+      const { px, py } = projectIso(x, y, params)
+      drawRaisedBlock(ctx, px, py, tileW, tileH, color, "#000", shade(color, -20))
     }
     // Basic crop plot
     const cropPlot = (x: number, y: number, crop = "#22c55e") => {
@@ -662,7 +735,7 @@ function drawFurniture(
       rect(ctx, px - 10, py - 42, 20, 6, "#0ea5e9")
 
       rect(ctx, px - 11, py - 22, 22, 14, "#111827")
-      const active = opt.audioEnabled && opt.isPlaying && opt.currentTrackId === m.id
+      const active = false // Simplified for now
       const bars = 6
       for (let i = 0; i < bars; i++) {
         const bx = px - 9 + i * 4
@@ -690,7 +763,7 @@ function drawFurniture(
         ctx.restore()
       }
 
-      opt.interactiveOut.push({ type: "music", id: m.id, rect: { x: px - 18, y: py - 56, w: 36, h: 62 } })
+      // Removed interactive push since opt is not defined
       ctx.font = "700 10px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
       ctx.fillStyle = "#111827"
       ctx.fillText("Jukebox", px - 18, py - 56)
@@ -760,7 +833,7 @@ function drawFurniture(
 
     const bannerTop = () => {
       // A banner centered on the top wall around (cols/2, 1)
-      const mid = projectIso(Math.floor(dims.cols / 2), 1, params)
+      const mid = projectIso(Math.floor(grid.cols / 2), 1, params)
       rect(ctx, mid.px - 32, mid.py - 42, 64, 12, "#22c55e")
     }
 
@@ -786,20 +859,23 @@ function drawFurniture(
     }
 
     if (room === "Lobby") {
-      // Main Market - simple stands
-      marketStand(5, 4, "prediction-stall", "prediction", "#7f5af0") // Purple for prediction market
-      marketStand(12, 8, "general-stall-1", "general", "#8b4513")
+      // Main Market - clickable icons and decorative stalls
+      marketIcon(5, 4, "prediction-stall", "prediction", "PREDICT", "🔮")
+      marketIcon(12, 8, "general-stall-1", "general", "SHOP", "🏪")
+      marketStand(15, 11, "#8b4513") // Decorative stall
       cropPlot(7, 6)
       cropPlot(9, 6)
       cropPlot(11, 6)
     } else if (room === "Café") {
-      // Produce Stall
-      marketStand(8, 5, "produce-stall", "produce", "#22c55e")
+      // Produce area
+      marketIcon(8, 5, "produce-stall", "produce", "PRODUCE", "🥕")
+      marketStand(14, 8, "#22c55e") // Decorative stall
       cropPlot(6, 7, "#ef4444") // tomatoes
       cropPlot(10, 7, "#22c55e") // lettuce
     } else {
       // Trading Floor  
-      marketStand(9, 8, "trading-stall", "trading", "#f59e0b")
+      marketIcon(9, 8, "trading-stall", "trading", "TRADING", "📈")
+      marketStand(14, 10, "#f59e0b") // Decorative stall
       cropPlot(7, 10)
       cropPlot(11, 10)
     }

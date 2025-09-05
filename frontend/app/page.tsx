@@ -106,18 +106,24 @@ export default function Page() {
   const handleRoomChange = useCallback((next: RoomPreset) => setRoom(next), [])
 
   const handleStallClick = useCallback((stallId: string, stallType: string) => {
+    console.log(`=== STALL CLICK HANDLER ===`)
     console.log(`Clicked stall: ${stallId} (${stallType})`)
+    console.log(`Router:`, router)
     
     if (stallType === "prediction") {
+      console.log(`Routing to prediction markets...`)
       // Route to prediction markets page
       router.push("/prediction-markets")
     } else if (stallType === "produce") {
+      console.log(`Routing to produce shop...`)
       // Route to produce shop (placeholder)
       router.push("/produce-shop")
     } else if (stallType === "trading") {
+      console.log(`Routing to trading floor...`)
       // Route to trading floor (placeholder)  
       router.push("/trading-floor")
     } else {
+      console.log(`Showing closed message for ${stallType}`)
       // General stall - show closed message
       alert(`This ${stallType} stall is currently closed. Come back later!`)
     }
