@@ -32,15 +32,6 @@ class PredictionMarketClient {
     this.client = new Client({
       ...networks.testnet,
       rpcUrl: "https://soroban-testnet.stellar.org:443",
-      allowHttp: false,
-      publicKey: async () => {
-        const address = await getPublicKey();
-        return address || "";
-      },
-      signTransaction: async (txXdr: string) => {
-        const result = await signTransaction(txXdr);
-        return result.signedTxXdr;
-      },
     });
   }
 
@@ -88,11 +79,23 @@ class PredictionMarketClient {
         try {
           const result = await this.client.get_market({ market_id: i });
           const marketResult = await result.simulate();
-          if (marketResult.result && !marketResult.error) {
+          
+          // Handle Result<Market> type - check if it's successful
+          if (marketResult.result && typeof marketResult.result === 'object' && 'unwrap' in marketResult.result) {
+            try {
+              const market = marketResult.result.unwrap();
+              markets.push(this.convertMarket(market, i));
+            } catch (unwrapError) {
+              // Market might not exist or error occurred, continue
+              console.log(`Market ${i} not found or error:`, unwrapError);
+              break;
+            }
+          } else if (marketResult.result && !marketResult.error) {
+            // Fallback if Result type doesn't have unwrap method
             markets.push(this.convertMarket(marketResult.result, i));
           }
         } catch (error) {
-          // Market doesn't exist, continue
+          console.log(`Error fetching market ${i}:`, error);
           break;
         }
       }
@@ -156,7 +159,18 @@ class PredictionMarketClient {
     try {
       const result = await this.client.get_market({ market_id: marketId });
       const marketResult = await result.simulate();
-      if (marketResult.result && !marketResult.error) {
+      
+      // Handle Result<Market> type - check if it's successful
+      if (marketResult.result && typeof marketResult.result === 'object' && 'unwrap' in marketResult.result) {
+        try {
+          const market = marketResult.result.unwrap();
+          return this.convertMarket(market, marketId);
+        } catch (unwrapError) {
+          console.log(`Market ${marketId} not found:`, unwrapError);
+          return null;
+        }
+      } else if (marketResult.result && !marketResult.error) {
+        // Fallback if Result type doesn't have unwrap method
         return this.convertMarket(marketResult.result, marketId);
       }
       return null;
@@ -177,7 +191,7 @@ class PredictionMarketClient {
       // Convert amount to stroops (7 decimal places)
       const amountStroops = Math.floor(parseFloat(amount) * 10000000);
       
-      // Set up the client for this user
+      // Set up the client for this user (following Stellar docs pattern)
       this.client.options.publicKey = userAddress;
       this.client.options.signTransaction = signTransaction;
       
@@ -189,11 +203,11 @@ class PredictionMarketClient {
         amount: BigInt(amountStroops)
       });
 
-      const { result } = await transaction.signAndSend();
+      const txResult = await transaction.signAndSend();
       
       return {
         success: true,
-        hash: transaction.hash || "unknown"
+        txHash: txResult.getTransactionResponse?.txHash || "unknown"
       };
     } catch (error) {
       console.error("Failed to place bet:", error);
@@ -209,7 +223,7 @@ class PredictionMarketClient {
 
       console.log(`Creating market: ${question}, close: ${closeTs}, resolution: ${resolutionTs}`);
       
-      // Set up the client for this user
+      // Set up the client for this user (following Stellar docs pattern)
       this.client.options.publicKey = userAddress;
       this.client.options.signTransaction = signTransaction;
       
@@ -221,12 +235,12 @@ class PredictionMarketClient {
         resolution_ts: BigInt(resolutionTs)
       });
 
-      const { result } = await transaction.signAndSend();
+      const txResult = await transaction.signAndSend();
       
       return {
         success: true,
-        marketId: result,
-        hash: transaction.hash || "unknown"
+        marketId: txResult.result,
+        txHash: txResult.getTransactionResponse?.txHash || "unknown"
       };
     } catch (error) {
       console.error("Failed to create market:", error);
