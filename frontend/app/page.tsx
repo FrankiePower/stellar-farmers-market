@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { MessageSquare, Map, WifiOff } from 'lucide-react'
+import { MessageSquare, Map, Circle } from 'lucide-react'
 import IsoRoom, { type RoomPreset } from "@/components/iso-room"
 import ChatPanel from "@/components/chat-panel"
 import WindowFrame from "@/components/window-frame"
@@ -213,15 +213,13 @@ function PageContent() {
                 onSitChange={(value) => setSit(value)}
                 onStallClick={handleStallClick}
               />
-              {offlineMode && (
-                <div
-                  className="absolute bottom-2 left-2 text-[11px] text-black/80 rounded-md border border-black/30 bg-white/90 px-2 py-1 shadow-sm flex items-center gap-1"
-                  aria-live="polite"
-                >
-                  <WifiOff className="w-3.5 h-3.5" />
-                  <span>Offline mode (no Supabase env)</span>
-                </div>
-              )}
+              <div
+                className="absolute bottom-2 left-2 text-[11px] text-black/80 rounded-md border border-black/30 bg-white/90 px-2 py-1 shadow-sm flex items-center gap-1"
+                aria-live="polite"
+              >
+                <Circle className="w-2.5 h-2.5 fill-green-500 text-green-500" />
+                <span>Online mode</span>
+              </div>
             </div>
           </div>
         </div>
