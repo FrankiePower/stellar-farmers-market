@@ -130,7 +130,12 @@ export default function Page() {
   }, [router])
 
   const onlineCount = useMemo(() => (others ? others.length + 1 : 1), [others])
-  const roomTitle = useMemo(() => `${room} — Online: ${onlineCount}`, [room, onlineCount])
+  const roomTitle = useMemo(() => {
+    const roomName = room === "Lobby" ? "Main Market" : 
+                     room === "Café" ? "Produce Area" : 
+                     room === "Rooftop" ? "Trading Area" : room
+    return `${roomName} — Online: ${onlineCount}`
+  }, [room, onlineCount])
 
   // Use the last 10 messages for in-room bubbles (per author)
   const recentForBubbles = useMemo(() => messages.slice(-10), [messages])
@@ -223,8 +228,8 @@ export default function Page() {
             <div className="px-3 pb-3 space-y-2">
               {[
                 { label: "Main Market 🌾", value: "Lobby" as RoomPreset },
-                { label: "Produce Stall 🥕", value: "Café" as RoomPreset },
-                { label: "Trading Floor 📊", value: "Rooftop" as RoomPreset },
+                { label: "Produce Area 🥕", value: "Café" as RoomPreset },
+                { label: "Trading Area 📊", value: "Rooftop" as RoomPreset },
               ].map((r) => (
                 <div key={r.label} className={styles.navRow}>
                   <div className={styles.navDot} />
