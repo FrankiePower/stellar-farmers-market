@@ -10,10 +10,10 @@ export default function ProduceShopPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/">
+          <Link href="/?room=Café">
             <Button variant="outline" className="flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" />
-              Back to Market
+              Back to Produce Area
             </Button>
           </Link>
           <div>

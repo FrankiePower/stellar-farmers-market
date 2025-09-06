@@ -313,10 +313,10 @@ export default function PredictionMarketsPage() {
         <header className="mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link href="/">
+              <Link href="/?room=Lobby">
                 <Button variant="outline" className="border-green-300 text-green-100 hover:bg-green-800">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Market
+                  Back to Main Market
                 </Button>
               </Link>
               <div>

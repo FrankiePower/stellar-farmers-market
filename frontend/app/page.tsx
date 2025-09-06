@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { MessageSquare, Map, WifiOff } from 'lucide-react'
@@ -45,6 +45,7 @@ export default function Page() {
   const [uid, setUid] = useState("")
   const [displayName, setDisplayName] = useState("Guest")
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Offline mode: no Supabase env available on client
   const offlineMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -76,6 +77,13 @@ export default function Page() {
     
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const roomParam = searchParams.get('room')
+    if (roomParam && (roomParam === 'Lobby' || roomParam === 'Café' || roomParam === 'Rooftop')) {
+      setRoom(roomParam as RoomPreset)
+    }
+  }, [searchParams])
 
 
 
