@@ -28,6 +28,16 @@ export default function PredictionMarketsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   
+  // New state for enhanced features
+  const [kaleBalance, setKaleBalance] = useState<number>(0);
+  const [btcPrice, setBtcPrice] = useState<number | null>(null);
+  const [ethPrice, setEthPrice] = useState<number | null>(null);
+  const [marketOdds, setMarketOdds] = useState<{[key: number]: number}>({});
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolvingMarket, setResolvingMarket] = useState<number | null>(null);
+  const [resolveOutcome, setResolveOutcome] = useState<"Yes" | "No" | "Invalid">("Yes");
+  const [claimableMarkets, setClaimableMarkets] = useState<number[]>([]);
+  
   // Market creation form state
   const [marketForm, setMarketForm] = useState({
     question: "",
@@ -37,7 +47,7 @@ export default function PredictionMarketsPage() {
     resolutionTime: "",
   });
 
-  // Load markets from smart contract
+  // Load markets and enhanced data from smart contract
   useEffect(() => {
     const loadMarkets = async () => {
       try {
@@ -48,6 +58,51 @@ export default function PredictionMarketsPage() {
         // Get user address if wallet connected
         const address = await getPublicKey();
         setUserAddress(address);
+        
+        // Load enhanced features if user is connected
+        if (address) {
+          // Load user's KALE balance
+          try {
+            const balance = await predictionMarketClient.getKaleBalance(address);
+            setKaleBalance(balance);
+          } catch (error) {
+            console.error("Failed to load KALE balance:", error);
+          }
+          
+          // Load odds for each market
+          const odds: {[key: number]: number} = {};
+          for (const market of contractMarkets) {
+            try {
+              const marketOdds = await predictionMarketClient.getOdds(market.id);
+              odds[market.id] = marketOdds;
+            } catch (error) {
+              console.error(`Failed to load odds for market ${market.id}:`, error);
+              odds[market.id] = 50; // Default 50/50
+            }
+          }
+          setMarketOdds(odds);
+          
+          // Find claimable markets (resolved markets where user has winning stakes)
+          const claimable: number[] = [];
+          for (const market of contractMarkets) {
+            if (market.resolved && market.outcome) {
+              // Check if user has stakes in this market
+              try {
+                const stakes = await predictionMarketClient.getUserStakes(address);
+                const userStake = stakes.find(s => s.marketId === market.id);
+                if (userStake && 
+                    ((market.outcome === "Yes" && userStake.outcome === "Yes") ||
+                     (market.outcome === "No" && userStake.outcome === "No"))) {
+                  claimable.push(market.id);
+                }
+              } catch (error) {
+                console.error(`Failed to check stakes for market ${market.id}:`, error);
+              }
+            }
+          }
+          setClaimableMarkets(claimable);
+        }
+        
       } catch (error) {
         console.error("Failed to load markets:", error);
         // Fallback to mock data if contract fails
@@ -113,6 +168,69 @@ export default function PredictionMarketsPage() {
       alert("Failed to place bet. Please try again.");
     } finally {
       setBettingMarket(null);
+    }
+  };
+
+  // Enhanced bet function with validation
+  const handleEnhancedBet = async (marketId: number, outcome: "Yes" | "No", amount: string) => {
+    try {
+      if (!userAddress) {
+        alert("Please connect your wallet first");
+        return;
+      }
+      
+      // Check if user has enough KALE
+      const canBet = await predictionMarketClient.canBet(userAddress, amount);
+      if (!canBet) {
+        alert(`Insufficient KALE balance. You have ${kaleBalance.toFixed(2)} KALE`);
+        return;
+      }
+      
+      await handleBet(marketId, outcome, amount);
+    } catch (error) {
+      console.error("Failed to validate bet:", error);
+      alert("Failed to validate bet: " + (error as Error).message);
+    }
+  };
+
+  // Resolve market function
+  const handleResolveMarket = async () => {
+    try {
+      if (!userAddress || !resolvingMarket) return;
+      
+      const result = await predictionMarketClient.resolveMarket(resolvingMarket, resolveOutcome);
+      
+      if (result) {
+        // Refresh markets after successful resolution
+        const updatedMarkets = await predictionMarketClient.getMarkets();
+        setMarkets(updatedMarkets);
+        alert("Market resolved successfully!");
+        setShowResolveModal(false);
+        setResolvingMarket(null);
+      }
+    } catch (error) {
+      console.error("Failed to resolve market:", error);
+      alert("Failed to resolve market: " + (error as Error).message);
+    }
+  };
+
+  // Claim winnings function
+  const handleClaimWinnings = async (marketId: number) => {
+    try {
+      if (!userAddress) return;
+      
+      const result = await predictionMarketClient.claimWinnings(marketId);
+      
+      if (result) {
+        // Update balance and claimable markets
+        const balance = await predictionMarketClient.getKaleBalance(userAddress);
+        setKaleBalance(balance);
+        setClaimableMarkets(prev => prev.filter(id => id !== marketId));
+        alert(`Claimed ${Number(result.amount) / 10000000} KALE successfully!`);
+      }
+    } catch (error) {
+      console.error("Failed to claim winnings:", error);
+      alert("Failed to claim winnings: " + (error as Error).message);
     }
   };
 
@@ -215,8 +333,8 @@ export default function PredictionMarketsPage() {
           </div>
         </header>
 
-        {/* Stats Bar */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* Enhanced Stats Bar */}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
           <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-green-300/20">
             <div className="flex items-center gap-3">
               <div className="text-green-300">📊</div>
@@ -261,7 +379,75 @@ export default function PredictionMarketsPage() {
               </div>
             </div>
           </div>
+          
+          {/* New Enhanced Stats */}
+          {userAddress && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-green-300/20">
+              <div className="flex items-center gap-3">
+                <div className="text-green-300">🥬</div>
+                <div>
+                  <div className="text-2xl font-bold text-white">
+                    {kaleBalance.toFixed(2)}
+                  </div>
+                  <div className="text-green-200 text-sm">Your KALE Balance</div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {btcPrice && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-green-300/20">
+              <div className="flex items-center gap-3">
+                <div className="text-orange-300">₿</div>
+                <div>
+                  <div className="text-xl font-bold text-white">
+                    ${btcPrice.toLocaleString()}
+                  </div>
+                  <div className="text-green-200 text-sm">BTC Price (Oracle)</div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {ethPrice && (
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-green-300/20">
+              <div className="flex items-center gap-3">
+                <div className="text-blue-300">⟠</div>
+                <div>
+                  <div className="text-xl font-bold text-white">
+                    ${ethPrice.toLocaleString()}
+                  </div>
+                  <div className="text-green-200 text-sm">ETH Price (Oracle)</div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Claimable Winnings Alert */}
+        {userAddress && claimableMarkets.length > 0 && (
+          <div className="bg-green-600/20 border border-green-400 rounded-lg p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="text-green-300">🎉</div>
+                <div>
+                  <div className="font-bold text-white">
+                    You have {claimableMarkets.length} winning bets to claim!
+                  </div>
+                  <div className="text-green-200 text-sm">
+                    Click the "Claim Winnings" buttons on resolved markets below
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={() => claimableMarkets.forEach(handleClaimWinnings)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Claim All
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Filter Bar */}
         <div className="flex items-center justify-between mb-6">
@@ -338,14 +524,34 @@ export default function PredictionMarketsPage() {
                     <span className="text-green-300">Pool Size</span>
                     <span className="text-white font-medium">{(market.totalYes + market.totalNo).toFixed(1)} KALE</span>
                   </div>
+                  
+                  {/* Live Odds Display */}
+                  {marketOdds[market.id] && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-300">Live Odds</span>
+                      <span className="text-white font-medium">
+                        {marketOdds[market.id]}% Yes, {100 - marketOdds[market.id]}% No
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between text-sm">
                     <span className="text-green-300">Status</span>
-                    <span className="text-white font-medium">{market.status}</span>
+                    <span className={`font-medium ${
+                      market.status === "Open" ? "text-green-400" : 
+                      market.status === "Closed" ? "text-yellow-400" : "text-blue-400"
+                    }`}>
+                      {market.resolved && market.outcome ? `Resolved: ${market.outcome}` : market.status}
+                    </span>
                   </div>
+                  
                   <div className="flex justify-between text-sm">
                     <span className="text-green-300">Closes In</span>
                     <span className="text-white font-medium">
-                      {Math.ceil((market.closeTs - Math.floor(Date.now() / 1000)) / (24 * 60 * 60))} days
+                      {market.closeTs > Math.floor(Date.now() / 1000) ? 
+                        `${Math.ceil((market.closeTs - Math.floor(Date.now() / 1000)) / (24 * 60 * 60))} days` :
+                        "Closed"
+                      }
                     </span>
                   </div>
                 </div>
@@ -355,36 +561,62 @@ export default function PredictionMarketsPage() {
                     <p className="text-center text-green-200 text-sm mb-4">
                       Connect wallet to place bets
                     </p>
+                  ) : market.resolved ? (
+                    <div className="space-y-3">
+                      {claimableMarkets.includes(market.id) ? (
+                        <Button 
+                          onClick={() => handleClaimWinnings(market.id)}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                        >
+                          🎉 Claim Your Winnings
+                        </Button>
+                      ) : (
+                        <p className="text-center text-green-200 text-sm">
+                          Market resolved: {market.outcome}
+                        </p>
+                      )}
+                      
+                      {/* Admin resolve button for closed but unresolved markets */}
+                      {!market.resolved && market.status === "Closed" && (
+                        <Button 
+                          onClick={() => {
+                            setResolvingMarket(market.id);
+                            setShowResolveModal(true);
+                          }}
+                          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          🔧 Resolve Market (Admin)
+                        </Button>
+                      )}
+                    </div>
                   ) : (
-                    <p className="text-center text-green-200 text-sm mb-4">
-                      Bet 0.5 KALE on the outcome
-                    </p>
-                  )}
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button 
-                      onClick={() => handleBet(market.id, "Yes", "0.5")}
-                      disabled={!userAddress || market.status !== "Open" || bettingMarket === market.id}
-                      className="bg-green-600 hover:bg-green-700 text-white disabled:bg-green-600/50"
-                    >
-                      {bettingMarket === market.id ? "..." : `YES ${market.totalYes + market.totalNo > 0 ? Math.round((market.totalYes / (market.totalYes + market.totalNo)) * 100) : 50}%`}
-                    </Button>
-                    <Button 
-                      onClick={() => handleBet(market.id, "No", "0.5")}
-                      disabled={!userAddress || market.status !== "Open" || bettingMarket === market.id}
-                      className="bg-red-600 hover:bg-red-700 text-white disabled:bg-red-600/50"
-                    >
-                      {bettingMarket === market.id ? "..." : `NO ${market.totalYes + market.totalNo > 0 ? Math.round((market.totalNo / (market.totalYes + market.totalNo)) * 100) : 50}%`}
-                    </Button>
-                  </div>
-                  
-                  {market.resolved && market.outcome && (
-                    <div className="mt-3 text-center">
-                      <span className={`text-sm font-medium ${
-                        market.outcome === "Yes" ? "text-green-400" : "text-red-400"
-                      }`}>
-                        Resolved: {market.outcome}
-                      </span>
+                    <div className="space-y-3">
+                      <p className="text-center text-green-200 text-sm">
+                        Bet 0.5 KALE • Balance: {kaleBalance.toFixed(2)} KALE
+                      </p>
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          onClick={() => handleEnhancedBet(market.id, "Yes", "0.5")}
+                          disabled={!userAddress || market.status !== "Open" || bettingMarket === market.id || kaleBalance < 0.5}
+                          className="bg-green-600 hover:bg-green-700 text-white disabled:bg-green-600/50"
+                        >
+                          {bettingMarket === market.id ? "..." : `YES ${marketOdds[market.id] || 50}%`}
+                        </Button>
+                        <Button 
+                          onClick={() => handleEnhancedBet(market.id, "No", "0.5")}
+                          disabled={!userAddress || market.status !== "Open" || bettingMarket === market.id || kaleBalance < 0.5}
+                          className="bg-red-600 hover:bg-red-700 text-white disabled:bg-red-600/50"
+                        >
+                          {bettingMarket === market.id ? "..." : `NO ${100 - (marketOdds[market.id] || 50)}%`}
+                        </Button>
+                      </div>
+                      
+                      {kaleBalance < 0.5 && (
+                        <p className="text-center text-red-400 text-xs">
+                          Insufficient KALE balance for minimum bet
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -501,6 +733,78 @@ export default function PredictionMarketsPage() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {createLoading ? "Creating..." : "Create Market"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Resolution Modal */}
+      <Dialog open={showResolveModal} onOpenChange={setShowResolveModal}>
+        <DialogContent className="sm:max-w-[400px] bg-slate-900 border-green-700">
+          <DialogHeader>
+            <DialogTitle className="text-green-100">Resolve Market</DialogTitle>
+            <DialogDescription className="text-green-200">
+              Select the outcome for market #{resolvingMarket}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="space-y-3">
+              <Label className="text-green-100">Market Outcome</Label>
+              <div className="grid gap-2">
+                <Button
+                  variant={resolveOutcome === "Yes" ? "default" : "outline"}
+                  onClick={() => setResolveOutcome("Yes")}
+                  className={resolveOutcome === "Yes" 
+                    ? "bg-green-600 hover:bg-green-700" 
+                    : "border-green-700 text-green-200 hover:bg-green-800"
+                  }
+                >
+                  ✅ YES - The prediction came true
+                </Button>
+                <Button
+                  variant={resolveOutcome === "No" ? "default" : "outline"}
+                  onClick={() => setResolveOutcome("No")}
+                  className={resolveOutcome === "No" 
+                    ? "bg-red-600 hover:bg-red-700" 
+                    : "border-green-700 text-green-200 hover:bg-green-800"
+                  }
+                >
+                  ❌ NO - The prediction was false
+                </Button>
+                <Button
+                  variant={resolveOutcome === "Invalid" ? "default" : "outline"}
+                  onClick={() => setResolveOutcome("Invalid")}
+                  className={resolveOutcome === "Invalid" 
+                    ? "bg-yellow-600 hover:bg-yellow-700" 
+                    : "border-green-700 text-green-200 hover:bg-green-800"
+                  }
+                >
+                  ⚠️ INVALID - Cancel the market
+                </Button>
+              </div>
+            </div>
+            
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+              <p className="text-sm text-blue-200">
+                🔧 <strong>Admin Action:</strong> This will finalize the market outcome and allow winners to claim their KALE.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowResolveModal(false)}
+              className="border-green-700 text-green-200 hover:bg-green-800"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleResolveMarket}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Resolve Market
             </Button>
           </DialogFooter>
         </DialogContent>

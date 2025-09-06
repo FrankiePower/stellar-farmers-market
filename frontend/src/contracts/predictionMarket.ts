@@ -248,6 +248,129 @@ class PredictionMarketClient {
     }
   }
 
+  // Resolve a market (admin/resolver only)
+  async resolveMarket(marketId: number, outcome: "Yes" | "No" | "Invalid"): Promise<any> {
+    try {
+      const userAddress = await getPublicKey();
+      if (!userAddress) throw new Error("Wallet not connected");
+
+      console.log(`Resolving market ${marketId} with outcome: ${outcome}`);
+      
+      // Set up the client for this user (following Stellar docs pattern)
+      this.client.options.publicKey = userAddress;
+      this.client.options.signTransaction = signTransaction;
+      
+      // Convert outcome to contract format
+      const contractOutcome = { tag: outcome, values: undefined };
+      
+      // Build and sign the transaction
+      const transaction = await this.client.resolve({
+        market_id: marketId,
+        outcome: contractOutcome
+      });
+
+      const txResult = await transaction.signAndSend();
+      
+      return {
+        success: true,
+        txHash: txResult.getTransactionResponse?.txHash || "unknown"
+      };
+    } catch (error) {
+      console.error("Failed to resolve market:", error);
+      throw error;
+    }
+  }
+
+  // Claim winnings from resolved market
+  async claimWinnings(marketId: number): Promise<any> {
+    try {
+      const userAddress = await getPublicKey();
+      if (!userAddress) throw new Error("Wallet not connected");
+
+      console.log(`Claiming winnings from market ${marketId}`);
+      
+      // Set up the client for this user (following Stellar docs pattern)
+      this.client.options.publicKey = userAddress;
+      this.client.options.signTransaction = signTransaction;
+      
+      // Build and sign the transaction
+      const transaction = await this.client.claim({
+        user: userAddress,
+        market_id: marketId
+      });
+
+      const txResult = await transaction.signAndSend();
+      
+      return {
+        success: true,
+        amount: txResult.result,
+        txHash: txResult.getTransactionResponse?.txHash || "unknown"
+      };
+    } catch (error) {
+      console.error("Failed to claim winnings:", error);
+      throw error;
+    }
+  }
+
+  // Get market odds (Yes percentage)
+  async getOdds(marketId: number): Promise<number> {
+    try {
+      const result = await this.client.get_odds({ market_id: marketId });
+      const oddsResult = await result.simulate();
+      
+      if (oddsResult.result && typeof oddsResult.result === 'object' && 'unwrap' in oddsResult.result) {
+        return Number(oddsResult.result.unwrap());
+      } else if (oddsResult.result) {
+        return Number(oddsResult.result);
+      }
+      return 50; // Default 50/50 odds
+    } catch (error) {
+      console.error("Failed to get odds:", error);
+      return 50;
+    }
+  }
+
+  // Get user's KALE balance
+  async getKaleBalance(userAddress: string): Promise<number> {
+    try {
+      const result = await this.client.get_kale_balance({ user: userAddress });
+      const balanceResult = await result.simulate();
+      
+      if (balanceResult.result && typeof balanceResult.result === 'object' && 'unwrap' in balanceResult.result) {
+        return Number(balanceResult.result.unwrap()) / 10000000; // Convert from stroops
+      } else if (balanceResult.result) {
+        return Number(balanceResult.result) / 10000000;
+      }
+      return 0;
+    } catch (error) {
+      console.error("Failed to get KALE balance:", error);
+      return 0;
+    }
+  }
+
+  // Check if user can place a bet
+  async canBet(userAddress: string, amount: string): Promise<boolean> {
+    try {
+      const amountStroops = Math.floor(parseFloat(amount) * 10000000);
+      const result = await this.client.can_bet({ 
+        user: userAddress, 
+        amount: BigInt(amountStroops) 
+      });
+      const canBetResult = await result.simulate();
+      
+      if (canBetResult.result && typeof canBetResult.result === 'object' && 'unwrap' in canBetResult.result) {
+        return Boolean(canBetResult.result.unwrap());
+      } else if (canBetResult.result) {
+        return Boolean(canBetResult.result);
+      }
+      return false;
+    } catch (error) {
+      console.error("Failed to check if user can bet:", error);
+      return false;
+    }
+  }
+
+
   // Get user's stakes in all markets
   async getUserStakes(userAddress: string): Promise<UserStake[]> {
     try {
