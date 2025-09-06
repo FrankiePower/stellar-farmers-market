@@ -767,10 +767,10 @@ function drawFurniture(
     const marketIcon = (x: number, y: number, id: string, type: string, label: string, icon: string) => {
       const { px, py } = projectIso(x, y, params)
       
-      // Pulsing glow effect for important stalls (excluding prediction market)
+      // Pulsing glow effect for important stalls (excluding prediction market, produce, and trading)
       const isProduce = type === "produce"  
       const isTrading = type === "trading"
-      const isImportant = isProduce || isTrading
+      const isImportant = false
       
       if (isImportant) {
         const glowIntensity = (Math.sin(t * 3) + 1) / 2 // Pulsing between 0-1
