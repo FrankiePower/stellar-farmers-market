@@ -466,6 +466,7 @@ export default function IsoRoom({
       }
 
       const dpr = window.devicePixelRatio || 1
+      if (!canvas || !ctx) return
       if (canvas.width !== Math.floor(size.w * dpr) || canvas.height !== Math.floor(size.h * dpr)) {
         canvas.width = Math.floor(size.w * dpr); canvas.height = Math.floor(size.h * dpr)
       }
@@ -474,11 +475,9 @@ export default function IsoRoom({
       ctx.imageSmoothingEnabled = false
 
       // background (constant speed, softer clouds without borders)
-      if (ctx) {
-        drawSky(ctx, size.w, size.h, bgTimeRef.current)
-        drawCloudsBack(ctx, size.w, bgTimeRef.current)
-        drawBirds(ctx, size.w, size.h, bgTimeRef.current)
-      }
+      drawSky(ctx, size.w, size.h, bgTimeRef.current)
+      drawCloudsBack(ctx, size.w, bgTimeRef.current)
+      drawBirds(ctx, size.w, size.h, bgTimeRef.current)
 
       const originInfo = computeCenteredOrigin(size.w, size.h, grid.cols, grid.rows, tileW, tileH)
       const params: IsoProjectParams = { tileW, tileH, originX: originInfo.x, originY: originInfo.y }
@@ -494,10 +493,7 @@ export default function IsoRoom({
         }
       }
 
-      if (ctx) {
-        drawWalls(ctx, grid, params, tileW, tileH)
-        drawFurniture(ctx, room, params, tileW, tileH, animRef.current, stallsRef)
-      }
+      drawWalls(ctx, grid, params, tileW, tileH)
 
       const smoothMap = smoothPeersRef.current
       const peerBlend = clamp(dt * 8, 0, 1)
@@ -1056,7 +1052,7 @@ function drawFurniture(
     ctx.beginPath(); ctx.arc(ax, ay - 26 + danceBob + laughJitter, 12, 0, Math.PI * 2); ctx.stroke()
     ctx.strokeRect(Math.round(ax - 10) + 0.5, Math.round(ay - 18 + danceBob + laughJitter) + 0.5, 20, 26)
 
-    drawFace(ctx, facing, ax, ay - 26 + danceBob + laughJitter, laughing)
+    drawFace(ctx, facing, ax, ay - 26 + danceBob + laughJitter, !!laughing)
   }
 
   function drawFace(ctx: CanvasRenderingContext2D, facing: "N" | "S" | "E" | "W", cx: number, cy: number, laughing: boolean) {

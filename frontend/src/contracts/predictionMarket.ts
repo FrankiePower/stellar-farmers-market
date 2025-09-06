@@ -90,7 +90,7 @@ class PredictionMarketClient {
               console.log(`Market ${i} not found or error:`, unwrapError);
               break;
             }
-          } else if (marketResult.result && !marketResult.error) {
+          } else if (marketResult.result && !(marketResult as any).error) {
             // Fallback if Result type doesn't have unwrap method
             markets.push(this.convertMarket(marketResult.result, i));
           }
@@ -169,7 +169,7 @@ class PredictionMarketClient {
           console.log(`Market ${marketId} not found:`, unwrapError);
           return null;
         }
-      } else if (marketResult.result && !marketResult.error) {
+      } else if (marketResult.result && !(marketResult as any).error) {
         // Fallback if Result type doesn't have unwrap method
         return this.convertMarket(marketResult.result, marketId);
       }

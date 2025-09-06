@@ -69,8 +69,8 @@ export function useMultiplayer({ room, userId, name, offline }: Options) {
   const channelRef = useRef<ReturnType<NonNullable<typeof supabase>["channel"]> | null>(null)
 
   useEffect(() => {
-    if (!leo.getDictionary()?.length) {
-      try { leo.loadDictionary() } catch {}
+    if (!(leo as any).getDictionary()?.length) {
+      try { (leo as any).loadDictionary() } catch {}
     }
   }, [])
 
