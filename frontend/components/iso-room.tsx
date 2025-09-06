@@ -132,7 +132,7 @@ export default function IsoRoom({
       for (let y = 6; y <= 9; y++) for (let x = 8; x <= 11; x++) block(x, y)
       ;[[3, 4],[15, 10]].forEach(([x, y]) => { block(x, y); block(x + 1, y) })
       ;[[8, 2],[9, 2],[10, 2]].forEach(([x, y]) => block(x, y))
-      ;[[6, 3],[13, 12]].forEach(([x, y]) => block(x, y))
+      ;[[13, 12]].forEach(([x, y]) => block(x, y))
       ;[[5, 9]].forEach(([x, y]) => block(x, y))
     } else if (room === "Café") {
       ;[[5,5],[6,5],[5,6],[14,5],[14,6],[13,5],[10,9],[10,10],[9,9]].forEach(([x,y]) => block(x,y))
@@ -494,6 +494,7 @@ export default function IsoRoom({
       }
 
       drawWalls(ctx, grid, params, tileW, tileH)
+      drawFurniture(ctx, room, params, tileW, tileH, animRef.current, stallsRef)
 
       const smoothMap = smoothPeersRef.current
       const peerBlend = clamp(dt * 8, 0, 1)
@@ -591,6 +592,14 @@ export default function IsoRoom({
         className="block w-full h-full cursor-pointer touch-none"
         aria-label="Isometric room canvas"
       />
+      
+      
+      {/* Controls Hint */}
+      <div className="absolute bottom-4 right-4 bg-black/20 backdrop-blur-sm rounded-lg px-3 py-2 text-white text-xs">
+        <div>🎮 <strong>WASD</strong> or <strong>Arrow Keys</strong> to move</div>
+        <div>🖱️ <strong>Click</strong> stalls to interact</div>
+        <div>💬 <strong>Double-click</strong> to chat</div>
+      </div>
       
       {/* Visit Dialog */}
       <Dialog open={!!visitPopup} onOpenChange={(open) => !open && setVisitPopup(null)}>
@@ -754,20 +763,61 @@ function drawFurniture(
     // Clear stalls array at start of each frame
     stallsRef.current = []
     
-    // Large clickable icon (no stall structure)
+    // Enhanced clickable icon with visual polish
     const marketIcon = (x: number, y: number, id: string, type: string, label: string, icon: string) => {
       const { px, py } = projectIso(x, y, params)
       
-      // Large icon
+      // Pulsing glow effect for important stalls (excluding prediction market)
+      const isProduce = type === "produce"  
+      const isTrading = type === "trading"
+      const isImportant = isProduce || isTrading
+      
+      if (isImportant) {
+        const glowIntensity = (Math.sin(t * 3) + 1) / 2 // Pulsing between 0-1
+        const glowSize = 15 + glowIntensity * 8
+        
+        ctx.save()
+        ctx.globalAlpha = 0.3 + glowIntensity * 0.2
+        ctx.fillStyle = isProduce ? "#22c55e" : "#f59e0b"
+        ctx.beginPath()
+        ctx.arc(px, py - 10, glowSize, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+      
+      // Floating particles for active stalls (excluding prediction market)
+      if (isImportant) {
+        const particleCount = 3
+        for (let i = 0; i < particleCount; i++) {
+          const angle = (t * 0.5 + i * (Math.PI * 2 / particleCount)) % (Math.PI * 2)
+          const radius = 25 + Math.sin(t * 2 + i) * 5
+          const particleX = px + Math.cos(angle) * radius
+          const particleY = py - 10 + Math.sin(angle) * radius * 0.5 - Math.abs(Math.sin(t * 4 + i)) * 10
+          
+          ctx.save()
+          ctx.globalAlpha = 0.6 + Math.sin(t * 6 + i) * 0.3
+          ctx.font = "12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
+          ctx.textAlign = "center"
+          ctx.fillText(isProduce ? "🌱" : "💰", particleX, particleY)
+          ctx.restore()
+        }
+      }
+      
+      // Animated sway for sign
+      const swayAmount = Math.sin(t * 2 + x + y) * 1.5
+      const iconY = py - 10 + swayAmount
+      
+      // Large icon with animation
       ctx.font = "48px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
       ctx.fillStyle = "#fff"
       ctx.strokeStyle = "#000"
       ctx.lineWidth = 2
       ctx.textAlign = "center"
-      ctx.strokeText(icon, px, py - 10)
-      ctx.fillText(icon, px, py - 10)
+      ctx.strokeText(icon, px, iconY)
+      ctx.fillText(icon, px, iconY)
       
-      // Small label below icon
+      
+      // Ground label (static)
       ctx.font = "700 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
       ctx.fillStyle = "#000"
       ctx.strokeStyle = "#fff"
@@ -775,16 +825,26 @@ function drawFurniture(
       ctx.strokeText(label, px, py + 20)
       ctx.fillText(label, px, py + 20)
       
-      // Register as clickable area - make it larger and better positioned
+      // "Coming Soon" signs for general stalls
+      if (type === "general") {
+        ctx.font = "600 8px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
+        ctx.fillStyle = "#fbbf24"
+        ctx.strokeStyle = "#000"
+        ctx.lineWidth = 1
+        ctx.strokeText("COMING SOON", px, py + 35)
+        ctx.fillText("COMING SOON", px, py + 35)
+      }
+      
+      // Register as clickable area
       stallsRef.current.push({
         id,
         type,
         x,
         y,
         px,
-        py: py - 10, // Center the clickable area on the icon, not the ground
-        width: 80, // Even larger clickable area
-        height: 80 // Larger height to cover icon + text
+        py: py - 10,
+        width: 80,
+        height: 80
       })
     }
     
@@ -949,23 +1009,11 @@ function drawFurniture(
       marketIcon(12, 7, "governance-stall", "general", "VOTE", "🗳️") // KALE governance
       marketIcon(16, 11, "exchange-stall", "general", "EXCHANGE", "🔄") // KALE token exchange
       
-      // KALE-themed crop displays  
-      cropPlot(4, 10, "#22c55e") // KALE patch
-      cropPlot(10, 4, "#ef4444") // tomato patch  
-      cropPlot(8, 13, "#f59e0b") // corn patch
-      cropPlot(15, 8, "#9333ea") // purple kale
     } else if (room === "Café") {
       // Produce area - KALE dining & wellness
       marketIcon(5, 3, "produce-stall", "produce", "PRODUCE", "🥕") // Fresh produce
       marketIcon(12, 5, "kale-cafe", "general", "KALE CAFÉ", "☕") // KALE smoothies & health foods
       marketIcon(16, 8, "wellness-stall", "general", "WELLNESS", "🧘") // KALE health benefits
-      
-      // Organic displays with KALE focus
-      cropPlot(3, 8, "#22c55e") // Fresh KALE
-      cropPlot(8, 7, "#22c55e") // Baby KALE  
-      cropPlot(10, 11, "#9333ea") // Purple KALE
-      cropPlot(14, 12, "#f59e0b") // Golden KALE
-      cropPlot(6, 13, "#16a34a") // Curly KALE
     } else {
       // Trading Floor - KALE DeFi services
       marketIcon(6, 4, "trading-stall", "trading", "TRADING", "📈") // Central
@@ -1169,6 +1217,57 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: n
   if (fill) ctx.fill()
   if (stroke) ctx.stroke()
 }
+function drawFloatingElements(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+  ctx.save()
+  
+  // Floating KALE tokens
+  const tokenCount = 6
+  for (let i = 0; i < tokenCount; i++) {
+    const x = (w * 0.1) + ((t * 20 + i * 120) % (w * 0.8))
+    const y = 60 + Math.sin(t * 0.8 + i * 1.2) * 15 + (i % 3) * 20
+    
+    ctx.globalAlpha = 0.7 + Math.sin(t * 2 + i) * 0.2
+    ctx.font = "16px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
+    ctx.textAlign = "center"
+    
+    // Rotate the token slightly
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(Math.sin(t * 1.5 + i) * 0.3)
+    ctx.fillText("🥬", 0, 0)
+    ctx.restore()
+  }
+  
+  // Sparkle effects
+  const sparkleCount = 8
+  for (let i = 0; i < sparkleCount; i++) {
+    const x = (t * 15 + i * 80) % w
+    const y = 40 + Math.sin(t * 1.2 + i * 0.8) * 20 + (i % 4) * 15
+    
+    const sparklePhase = (t * 4 + i) % (Math.PI * 2)
+    const brightness = Math.max(0, Math.sin(sparklePhase))
+    
+    if (brightness > 0.1) {
+      ctx.globalAlpha = brightness
+      ctx.font = `${8 + brightness * 4}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto`
+      ctx.textAlign = "center"
+      
+      // Random sparkle types
+      const sparkles = ["✨", "⭐", "🌟", "💫"]
+      const sparkleType = sparkles[i % sparkles.length]
+      
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.rotate(t * 2 + i)
+      ctx.scale(brightness, brightness)
+      ctx.fillText(sparkleType, 0, 0)
+      ctx.restore()
+    }
+  }
+  
+  ctx.restore()
+}
+
 function shade(hex: string, percent: number) {
   const f = parseInt(hex.slice(1), 16)
   const t = percent < 0 ? 0 : 255
