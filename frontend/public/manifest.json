@@ -1,0 +1,39 @@
+{
+  "name": "Kale Farmers Market - Web3 Metaverse",
+  "short_name": "KALE Market",
+  "description": "The first Web3 metaverse hub for the KALE ecosystem",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#22c55e",
+  "orientation": "landscape-primary",
+  "categories": ["games", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/placeholder-logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Prediction Markets",
+      "short_name": "Markets",
+      "description": "Bet KALE tokens on prediction markets",
+      "url": "/prediction-markets",
+      "icons": [
+        {
+          "src": "/favicon.ico",
+          "sizes": "48x48"
+        }
+      ]
+    }
+  ]
+}
