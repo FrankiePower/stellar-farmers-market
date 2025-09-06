@@ -825,8 +825,8 @@ function drawFurniture(
       ctx.strokeText(label, px, py + 20)
       ctx.fillText(label, px, py + 20)
       
-      // "Coming Soon" signs for general stalls
-      if (type === "general") {
+      // "Coming Soon" signs for general stalls (except working ones)
+      if (type === "general" && id !== "yield-stall") {
         ctx.font = "600 8px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto"
         ctx.fillStyle = "#fbbf24"
         ctx.strokeStyle = "#000"
@@ -1001,7 +1001,7 @@ function drawFurniture(
       // Main Market - KALE-focused activities
       marketIcon(3, 4, "prediction-stall", "prediction", "PREDICT", "🔮") // Corner spot
       marketIcon(7, 2, "stake-stall", "general", "STAKE", "🥬") // Stake KALE tokens
-      marketIcon(14, 3, "yield-stall", "general", "YIELD FARM", "🌾") // KALE yield farming
+      marketIcon(14, 3, "yield-stall", "general", "FARM", "🌾") // KALE yield farming
       marketIcon(9, 8, "mall-stall", "general", "KALE MALL", "🏬") // Central shopping with KALE
       
       marketIcon(2, 9, "liquidity-stall", "general", "LIQUIDITY", "💧") // KALE liquidity pools
@@ -1177,7 +1177,9 @@ function drawNameplates(ctx: CanvasRenderingContext2D, labels: { id: string; tex
         ctx.lineWidth = 1
         roundRect(ctx, candidate.x + 0.5, candidate.y + 0.5, candidate.w, candidate.h, 6, true, true)
         ctx.fillStyle = "#111827"
-        ctx.fillText(l.text, candidate.x + padX, candidate.y + h - padY - 2)
+        ctx.textAlign = "center"
+        ctx.fillText(l.text, candidate.x + candidate.w / 2, candidate.y + h - padY - 2)
+        ctx.textAlign = "start"
         break
       }
       cy -= 8

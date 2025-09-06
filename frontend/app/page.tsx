@@ -11,6 +11,7 @@ import WindowFrame from "@/components/window-frame"
 import ConnectWallet from "@/components/ConnectWallet"
 import styles from "@/styles/habbo.module.css"
 import { useMultiplayer } from "@/hooks/use-multiplayer"
+import { getPublicKey } from "../src/stellar-wallets-kit"
 
 function getOrCreateId(key: string) {
   try {
@@ -48,10 +49,32 @@ export default function Page() {
   // Offline mode: no Supabase env available on client
   const offlineMode = !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
+  const shortenAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
 
   useEffect(() => {
     setUid(getOrCreateId("pp_uid"))
-    setDisplayName(getOrCreateName())
+    
+    async function updateDisplayName() {
+      try {
+        const walletAddress = await getPublicKey()
+        if (walletAddress) {
+          setDisplayName(shortenAddress(walletAddress))
+        } else {
+          setDisplayName(getOrCreateName())
+        }
+      } catch {
+        setDisplayName(getOrCreateName())
+      }
+    }
+    
+    updateDisplayName()
+
+    // Listen for wallet connection changes
+    const interval = setInterval(updateDisplayName, 2000)
+    
+    return () => clearInterval(interval)
   }, [])
 
 
@@ -122,6 +145,10 @@ export default function Page() {
       console.log(`Routing to trading floor...`)
       // Route to trading floor (placeholder)  
       router.push("/trading-floor")
+    } else if (stallId === "yield-stall") {
+      console.log(`Routing to KALE farm...`)
+      // Route to external KALE farm website
+      window.open("https://testnet.kalefarm.xyz/", "_blank")
     } else {
       console.log(`Showing closed message for ${stallType}`)
       // General stall - show closed message
