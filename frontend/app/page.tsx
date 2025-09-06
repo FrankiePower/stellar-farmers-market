@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -37,7 +37,7 @@ function getOrCreateName() {
 }
 
 
-export default function Page() {
+function PageContent() {
   const [room, setRoom] = useState<RoomPreset>("Lobby")
   const [chatOpen, setChatOpen] = useState(true)
   const [navOpen, setNavOpen] = useState(true)
@@ -286,5 +286,13 @@ export default function Page() {
       )}
 
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="min-h-[100dvh] flex items-center justify-center bg-[#a3b18a]">Loading...</div>}>
+      <PageContent />
+    </Suspense>
   )
 }

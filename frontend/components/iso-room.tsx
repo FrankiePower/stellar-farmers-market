@@ -470,7 +470,7 @@ export default function IsoRoom({
       if (canvas.width !== Math.floor(size.w * dpr) || canvas.height !== Math.floor(size.h * dpr)) {
         canvas.width = Math.floor(size.w * dpr); canvas.height = Math.floor(size.h * dpr)
       }
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
       ctx.clearRect(0, 0, size.w, size.h)
       ctx.imageSmoothingEnabled = false
 
