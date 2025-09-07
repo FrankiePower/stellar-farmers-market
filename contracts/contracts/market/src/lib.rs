@@ -1,11 +1,11 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractimpl, contracttype, contracterror, contractclient,
-    symbol_short, Address, Env, String, Symbol, token
+    contract, contractclient, contracterror, contractimpl, contracttype, symbol_short, token,
+    Address, Env, String, Symbol,
 };
 
 mod reflector;
-use reflector::{ReflectorClient, Asset as ReflectorAsset, PriceData};
+use reflector::{Asset as ReflectorAsset, PriceData, ReflectorClient};
 
 // -------------------------------
 // Errors
@@ -46,12 +46,12 @@ pub struct Market {
     pub id: u32,
     pub question: String,
     pub creator: Address,
-    pub close_ts: u64,         // when betting closes
-    pub resolution_ts: u64,    // when market can be resolved
+    pub close_ts: u64,      // when betting closes
+    pub resolution_ts: u64, // when market can be resolved
     pub resolved: bool,
     pub outcome: Outcome,
-    pub yes_pool: i128,        // total KALE staked on YES
-    pub no_pool: i128,         // total KALE staked on NO
+    pub yes_pool: i128, // total KALE staked on YES
+    pub no_pool: i128,  // total KALE staked on NO
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
@@ -74,7 +74,7 @@ pub enum DataKey {
     NextMarketId,
     Market(u32),
     Stake(u32, Address), // (market_id, user)
-    ReflectorOracle, // Reflector oracle contract address
+    ReflectorOracle,     // Reflector oracle contract address
 }
 
 // -------------------------------
@@ -84,7 +84,7 @@ pub enum DataKey {
 pub trait KaleContract {
     /// Get user's KALE balance from the SAC (Stellar Asset Contract)
     fn balance(env: Env, id: Address) -> i128;
-    
+
     /// Transfer KALE between accounts (uses SAC)
     fn transfer(env: Env, from: Address, to: Address, amount: i128);
 }
@@ -130,7 +130,8 @@ fn write_u32(e: &Env, key: DataKey, v: u32) {
 }
 
 fn read_market(e: &Env, id: u32) -> Result<Market, Error> {
-    e.storage().persistent()
+    e.storage()
+        .persistent()
         .get(&DataKey::Market(id))
         .ok_or(Error::MarketNotFound)
 }
@@ -140,13 +141,16 @@ fn write_market(e: &Env, m: &Market) {
 }
 
 fn read_stake(e: &Env, id: u32, user: &Address) -> Stake {
-    e.storage().persistent()
+    e.storage()
+        .persistent()
         .get(&DataKey::Stake(id, user.clone()))
         .unwrap_or_default()
 }
 
 fn write_stake(e: &Env, id: u32, user: &Address, s: &Stake) {
-    e.storage().persistent().set(&DataKey::Stake(id, user.clone()), s);
+    e.storage()
+        .persistent()
+        .set(&DataKey::Stake(id, user.clone()), s);
 }
 
 fn now(e: &Env) -> u64 {
@@ -183,42 +187,42 @@ pub struct FarmersMarket;
 impl FarmersMarket {
     /// Initialize the contract with KALE SAC address and Reflector oracle
     pub fn init(
-        e: Env, 
-        admin: Address, 
-        resolver: Address, 
-        kale_sac_address: Address  // KALE's Stellar Asset Contract address
+        e: Env,
+        admin: Address,
+        resolver: Address,
+        kale_sac_address: Address, // KALE's Stellar Asset Contract address
     ) -> Result<(), Error> {
         if e.storage().instance().has(&DataKey::KaleToken) {
             return Err(Error::AlreadyInitialized);
         }
-        
+
         admin.require_auth();
-        
+
         write_address(&e, DataKey::Admin, admin);
         write_address(&e, DataKey::Resolver, resolver);
-        write_address(&e, DataKey::KaleToken, kale_sac_address);  // This is KALE's SAC address
-        
+        write_address(&e, DataKey::KaleToken, kale_sac_address); // This is KALE's SAC address
+
         // Store Reflector oracle address
         let oracle_addr = Address::from_string(&String::from_str(&e, REFLECTOR_CEX_DEX_TESTNET));
         write_address(&e, DataKey::ReflectorOracle, oracle_addr);
-        
+
         write_u32(&e, DataKey::NextMarketId, 1);
-        
+
         e.events().publish((symbol_short!("Init"),), true);
         Ok(())
     }
 
     /// Create a new prediction market
     pub fn create_market(
-        e: Env, 
-        creator: Address, 
-        question: String, 
+        e: Env,
+        creator: Address,
+        question: String,
         close_ts: u64,
-        resolution_ts: u64
+        resolution_ts: u64,
     ) -> Result<u32, Error> {
         require_initialized(&e)?;
         creator.require_auth();
-        
+
         validate_market_timing(&e, close_ts, resolution_ts)?;
 
         let id = read_u32(&e, &DataKey::NextMarketId)?;
@@ -234,28 +238,29 @@ impl FarmersMarket {
             yes_pool: 0,
             no_pool: 0,
         };
-        
+
         write_market(&e, &market);
         write_u32(&e, DataKey::NextMarketId, id + 1);
-        
-        e.events().publish((symbol_short!("Created"), id, creator), question);
+
+        e.events()
+            .publish((symbol_short!("Created"), id, creator), question);
         Ok(id)
     }
 
     /// Place a bet on a market
     pub fn bet(
-        e: Env, 
-        user: Address, 
-        market_id: u32, 
-        side_yes: bool, 
-        amount: i128
+        e: Env,
+        user: Address,
+        market_id: u32,
+        side_yes: bool,
+        amount: i128,
     ) -> Result<(), Error> {
         require_initialized(&e)?;
         user.require_auth();
         validate_amount(amount)?;
-        
+
         let mut market = read_market(&e, market_id)?;
-        
+
         if now(&e) >= market.close_ts {
             return Err(Error::BetsClosed);
         }
@@ -267,7 +272,7 @@ impl FarmersMarket {
 
         // Update pools and user stake
         let mut stake = read_stake(&e, market_id, &user);
-        
+
         if side_yes {
             market.yes_pool += amount;
             stake.yes += amount;
@@ -275,11 +280,12 @@ impl FarmersMarket {
             market.no_pool += amount;
             stake.no += amount;
         }
-        
+
         write_market(&e, &market);
         write_stake(&e, market_id, &user, &stake);
-        
-        e.events().publish((symbol_short!("Bet"), market_id, user), (side_yes, amount));
+
+        e.events()
+            .publish((symbol_short!("Bet"), market_id, user), (side_yes, amount));
         Ok(())
     }
 
@@ -288,22 +294,23 @@ impl FarmersMarket {
         require_initialized(&e)?;
         let resolver = read_address(&e, &DataKey::Resolver)?;
         resolver.require_auth();
-        
+
         let mut market = read_market(&e, market_id)?;
-        
+
         if market.resolved {
             return Err(Error::AlreadyResolved);
         }
-        
+
         if now(&e) < market.resolution_ts {
             return Err(Error::InvalidTime);
         }
-        
+
         market.resolved = true;
         market.outcome = outcome.clone();
         write_market(&e, &market);
-        
-        e.events().publish((symbol_short!("Resolved"), market_id), outcome);
+
+        e.events()
+            .publish((symbol_short!("Resolved"), market_id), outcome);
         Ok(())
     }
 
@@ -311,7 +318,7 @@ impl FarmersMarket {
     pub fn claim(e: Env, user: Address, market_id: u32) -> Result<i128, Error> {
         require_initialized(&e)?;
         user.require_auth();
-        
+
         let market = read_market(&e, market_id)?;
         if !market.resolved {
             return Err(Error::NotResolved);
@@ -357,10 +364,11 @@ impl FarmersMarket {
         // Mark as claimed and transfer payout
         stake.claimed = true;
         write_stake(&e, market_id, &user, &stake);
-        
+
         token_client.transfer(&e.current_contract_address(), &user, &payout);
-        
-        e.events().publish((symbol_short!("Claimed"), market_id, user), payout);
+
+        e.events()
+            .publish((symbol_short!("Claimed"), market_id, user), payout);
         Ok(payout)
     }
 
@@ -371,7 +379,7 @@ impl FarmersMarket {
     pub fn get_market(e: Env, market_id: u32) -> Result<Market, Error> {
         read_market(&e, market_id)
     }
-    
+
     pub fn get_stake(e: Env, market_id: u32, user: Address) -> Stake {
         read_stake(&e, market_id, &user)
     }
@@ -392,7 +400,7 @@ impl FarmersMarket {
     pub fn get_odds(e: Env, market_id: u32) -> Result<u32, Error> {
         let market = read_market(&e, market_id)?;
         let total = market.yes_pool + market.no_pool;
-        
+
         if total == 0 {
             Ok(5000) // 50.00%
         } else {
@@ -422,7 +430,8 @@ impl FarmersMarket {
     pub fn get_total_locked_kale(e: Env) -> Result<i128, Error> {
         require_initialized(&e)?;
         let kale_sac = read_address(&e, &DataKey::KaleToken)?;
-        let contract_balance = KaleClient::new(&e, &kale_sac).balance(&e.current_contract_address());
+        let contract_balance =
+            KaleClient::new(&e, &kale_sac).balance(&e.current_contract_address());
         Ok(contract_balance)
     }
 
@@ -432,7 +441,7 @@ impl FarmersMarket {
     }
 
     // -------------------------------
-    // Reflector Oracle Integration 
+    // Reflector Oracle Integration
     // -------------------------------
 
     /// Get current BTC price from Reflector oracle
@@ -441,8 +450,9 @@ impl FarmersMarket {
         let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
         let reflector_client = ReflectorClient::new(&e, &oracle_addr);
         let btc_ticker = ReflectorAsset::Other(Symbol::new(&e, "BTC"));
-        
-        reflector_client.lastprice(&btc_ticker)
+
+        reflector_client
+            .lastprice(&btc_ticker)
             .ok_or(Error::OraclePriceUnavailable)
     }
 
@@ -452,8 +462,9 @@ impl FarmersMarket {
         let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
         let reflector_client = ReflectorClient::new(&e, &oracle_addr);
         let eth_ticker = ReflectorAsset::Other(Symbol::new(&e, "ETH"));
-        
-        reflector_client.lastprice(&eth_ticker)
+
+        reflector_client
+            .lastprice(&eth_ticker)
             .ok_or(Error::OraclePriceUnavailable)
     }
 
@@ -478,14 +489,15 @@ impl FarmersMarket {
         require_initialized(&e)?;
         let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
         let reflector_client = ReflectorClient::new(&e, &oracle_addr);
-        
+
         let eth_ticker = ReflectorAsset::Other(Symbol::new(&e, "ETH"));
         let btc_ticker = ReflectorAsset::Other(Symbol::new(&e, "BTC"));
-        
+
         // Use Reflector's cross-price functionality
-        let cross_price = reflector_client.x_last_price(&eth_ticker, &btc_ticker)
+        let cross_price = reflector_client
+            .x_last_price(&eth_ticker, &btc_ticker)
             .ok_or(Error::OraclePriceUnavailable)?;
-            
+
         Ok(cross_price.price)
     }
 
@@ -495,8 +507,9 @@ impl FarmersMarket {
         let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
         let reflector_client = ReflectorClient::new(&e, &oracle_addr);
         let btc_ticker = ReflectorAsset::Other(Symbol::new(&e, "BTC"));
-        
-        reflector_client.twap(&btc_ticker, &5)
+
+        reflector_client
+            .twap(&btc_ticker, &5)
             .ok_or(Error::OraclePriceUnavailable)
     }
 
@@ -505,11 +518,11 @@ impl FarmersMarket {
         require_initialized(&e)?;
         let oracle_addr = read_address(&e, &DataKey::ReflectorOracle)?;
         let reflector_client = ReflectorClient::new(&e, &oracle_addr);
-        
+
         let decimals = reflector_client.decimals();
         let resolution = reflector_client.resolution();
         let last_timestamp = reflector_client.last_timestamp();
-        
+
         Ok((decimals, resolution, last_timestamp))
     }
 
@@ -524,7 +537,11 @@ impl FarmersMarket {
     /// Demo: Auto-resolve a "Will BTC reach $200k?" type market
     pub fn demo_btc_200k_resolution(e: Env) -> Result<Outcome, Error> {
         let is_above_200k = Self::is_btc_above_price(e, 200_000)?;
-        Ok(if is_above_200k { Outcome::Yes } else { Outcome::No })
+        Ok(if is_above_200k {
+            Outcome::Yes
+        } else {
+            Outcome::No
+        })
     }
 }
 
