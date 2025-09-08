@@ -89,18 +89,32 @@ export async function connect(callback?: () => Promise<void>) {
   const kitInstance = getKit();
   if (!kitInstance) throw new Error("Wallet kit not available on server side");
   
+  // Debug: Check available wallets
+  try {
+    const supportedWallets = await kitInstance.getSupportedWallets();
+    console.log("Available wallets:", supportedWallets);
+  } catch (error) {
+    console.log("Error getting supported wallets:", error);
+  }
+  
   isConnecting = true;
   
   try {
     await kitInstance.openModal({
       onWalletSelected: async (option) => {
         try {
+          console.log("Wallet selected:", option);
           await setWallet(option.id);
           if (callback) await callback();
         } catch (e) {
           console.error(e);
         }
         return option.id;
+      },
+      onClosed: (err) => {
+        console.log("Wallet modal closed:", err);
+        // Reset connecting state when modal is closed without selection
+        isConnecting = false;
       },
     });
   } finally {

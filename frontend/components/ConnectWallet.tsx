@@ -39,6 +39,10 @@ export default function ConnectWallet({ onWalletChange }: ConnectWalletProps) {
     
     try {
       await connect(showConnected);
+    } catch (error) {
+      console.log("Connection failed:", error);
+      // Reset to disconnected state if connection fails
+      await showDisconnected();
     } finally {
       setIsConnecting(false);
     }
