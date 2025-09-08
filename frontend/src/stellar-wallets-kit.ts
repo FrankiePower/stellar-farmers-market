@@ -13,6 +13,7 @@ function getSelectedWalletId() {
 }
 
 let kit: StellarWalletsKit | null = null;
+let isConnecting = false;
 
 function getKit() {
   if (typeof window === "undefined") return null;
@@ -65,18 +66,38 @@ export async function disconnect(callback?: () => Promise<void>) {
 }
 
 export async function connect(callback?: () => Promise<void>) {
+  // Prevent multiple simultaneous connection attempts
+  if (isConnecting) {
+    console.log("Connection already in progress, ignoring duplicate call");
+    return;
+  }
+
+  // Check if already connected
+  const existingKey = await getPublicKey();
+  if (existingKey) {
+    console.log("Wallet already connected, skipping modal");
+    if (callback) await callback();
+    return;
+  }
+
   const kitInstance = getKit();
   if (!kitInstance) throw new Error("Wallet kit not available on server side");
   
-  await kitInstance.openModal({
-    onWalletSelected: async (option) => {
-      try {
-        await setWallet(option.id);
-        if (callback) await callback();
-      } catch (e) {
-        console.error(e);
-      }
-      return option.id;
-    },
-  });
+  isConnecting = true;
+  
+  try {
+    await kitInstance.openModal({
+      onWalletSelected: async (option) => {
+        try {
+          await setWallet(option.id);
+          if (callback) await callback();
+        } catch (e) {
+          console.error(e);
+        }
+        return option.id;
+      },
+    });
+  } finally {
+    isConnecting = false;
+  }
 }

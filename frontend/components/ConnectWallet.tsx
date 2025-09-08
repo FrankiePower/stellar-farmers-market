@@ -8,6 +8,7 @@ import styles from "@/styles/habbo.module.css";
 export default function ConnectWallet() {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   async function showDisconnected() {
     setPublicKey(null);
@@ -25,8 +26,16 @@ export default function ConnectWallet() {
   }
 
   const handleConnect = async () => {
+    if (isConnecting) return; // Prevent multiple clicks
+    
+    setIsConnecting(true);
     setIsLoading(true);
-    await connect(showConnected);
+    
+    try {
+      await connect(showConnected);
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleDisconnect = async () => {
@@ -50,10 +59,10 @@ export default function ConnectWallet() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  if (isLoading) {
+  if (isLoading || isConnecting) {
     return (
       <Button className={styles.goButton} disabled>
-        Loading...
+        {isConnecting ? "Connecting..." : "Loading..."}
       </Button>
     );
   }
