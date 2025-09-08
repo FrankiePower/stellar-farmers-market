@@ -38,12 +38,10 @@ export default function ConnectWallet({ onWalletChange }: ConnectWalletProps) {
     setIsLoading(true);
     
     try {
-      await connect(showConnected);
-      // After connect() completes, check if we actually got a wallet
-      // If not, reset to disconnected state (modal was closed without selection)
-      const currentKey = await getPublicKey();
-      if (!currentKey) {
-        await showDisconnected();
+      const address = await connect();
+      if (address && typeof address === 'string') {
+        setPublicKey(address);
+        onWalletChange?.(address);
       }
     } catch (error) {
       console.log("Connection failed:", error);
@@ -56,7 +54,8 @@ export default function ConnectWallet({ onWalletChange }: ConnectWalletProps) {
 
   const handleDisconnect = async () => {
     setIsLoading(true);
-    await disconnect(showDisconnected);
+    await disconnect();
+    await showDisconnected();
   };
 
   useEffect(() => {
