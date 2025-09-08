@@ -1,6 +1,5 @@
 import {
   allowAllModules,
-  FREIGHTER_ID,
   StellarWalletsKit,
   WalletNetwork,
 } from "@creit.tech/stellar-wallets-kit";
@@ -22,7 +21,6 @@ function getKit() {
     kit = new StellarWalletsKit({
       modules: allowAllModules(),
       network: WalletNetwork.TESTNET,
-      selectedWalletId: getSelectedWalletId() ?? FREIGHTER_ID,
     });
   }
   
