@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { getPublicKey, connect, disconnect } from "../src/stellar-wallets-kit";
 import styles from "@/styles/habbo.module.css";
 
-export default function ConnectWallet() {
+interface ConnectWalletProps {
+  onWalletChange?: (publicKey: string | null) => void;
+}
+
+export default function ConnectWallet({ onWalletChange }: ConnectWalletProps) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -13,12 +17,14 @@ export default function ConnectWallet() {
   async function showDisconnected() {
     setPublicKey(null);
     setIsLoading(false);
+    onWalletChange?.(null);
   }
 
   async function showConnected() {
     const key = await getPublicKey();
     if (key) {
       setPublicKey(key);
+      onWalletChange?.(key);
     } else {
       await showDisconnected();
     }
@@ -45,13 +51,20 @@ export default function ConnectWallet() {
 
   useEffect(() => {
     async function checkConnection() {
-      const key = await getPublicKey();
-      if (key) {
-        await showConnected();
-      } else {
+      try {
+        const key = await getPublicKey();
+        if (key) {
+          await showConnected();
+        } else {
+          await showDisconnected();
+        }
+      } catch (error) {
+        console.log("Wallet check failed:", error);
         await showDisconnected();
       }
     }
+    
+    // Only check once on mount, don't poll continuously
     checkConnection();
   }, []);
 

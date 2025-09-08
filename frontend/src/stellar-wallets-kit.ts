@@ -40,8 +40,14 @@ export async function getPublicKey() {
   const kitInstance = getKit();
   if (!kitInstance) return null;
   
-  const { address } = await kitInstance.getAddress();
-  return address;
+  try {
+    const { address } = await kitInstance.getAddress();
+    return address;
+  } catch (error) {
+    // If getting address fails, wallet is likely disconnected
+    console.log("Failed to get wallet address:", error);
+    return null;
+  }
 }
 
 export async function setWallet(walletId: string) {

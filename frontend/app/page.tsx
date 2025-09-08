@@ -70,12 +70,8 @@ function PageContent() {
       }
     }
     
+    // Only check wallet status once on mount
     updateDisplayName()
-
-    // Listen for wallet connection changes
-    const interval = setInterval(updateDisplayName, 2000)
-    
-    return () => clearInterval(interval)
   }, [])
 
   useEffect(() => {
@@ -164,6 +160,14 @@ function PageContent() {
     }
   }, [router])
 
+  const handleWalletChange = useCallback((publicKey: string | null) => {
+    if (publicKey) {
+      setDisplayName(shortenAddress(publicKey))
+    } else {
+      setDisplayName(getOrCreateName())
+    }
+  }, [])
+
   const onlineCount = useMemo(() => (others ? others.length + 1 : 1), [others])
   const roomTitle = useMemo(() => {
     const roomName = room === "Lobby" ? "Main Market" : 
@@ -191,7 +195,7 @@ function PageContent() {
             <Button variant="outline" className={styles.pixelButton} onClick={() => setChatOpen((v) => !v)}>
               <MessageSquare className="w-4 h-4" /> Chat
             </Button>
-            <ConnectWallet />
+            <ConnectWallet onWalletChange={handleWalletChange} />
           </div>
         </div>
       </header>
