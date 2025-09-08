@@ -34,14 +34,14 @@ export async function signTransaction(txXdr: string) {
   if (!kitInstance) throw new Error("Wallet kit not available on server side");
   return kitInstance.signTransaction(txXdr);
 }
-
 export async function getPublicKey() {
   if (!getSelectedWalletId()) return null;
   const kitInstance = getKit();
   if (!kitInstance) return null;
   
   try {
-    const { address } = await kitInstance.getAddress();
+    // Use skipRequestAccess to prevent modal from appearing
+    const { address } = await kitInstance.getAddress({ skipRequestAccess: true });
     return address;
   } catch (error) {
     // If getting address fails, wallet is likely disconnected
@@ -107,3 +107,4 @@ export async function connect(callback?: () => Promise<void>) {
     isConnecting = false;
   }
 }
+

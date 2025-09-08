@@ -11,7 +11,6 @@ import WindowFrame from "@/components/window-frame"
 import ConnectWallet from "@/components/ConnectWallet"
 import styles from "@/styles/habbo.module.css"
 import { useMultiplayer } from "@/hooks/use-multiplayer"
-import { getPublicKey } from "../src/stellar-wallets-kit"
 
 function getOrCreateId(key: string) {
   try {
@@ -56,22 +55,8 @@ function PageContent() {
 
   useEffect(() => {
     setUid(getOrCreateId("pp_uid"))
-    
-    async function updateDisplayName() {
-      try {
-        const walletAddress = await getPublicKey()
-        if (walletAddress) {
-          setDisplayName(shortenAddress(walletAddress))
-        } else {
-          setDisplayName(getOrCreateName())
-        }
-      } catch {
-        setDisplayName(getOrCreateName())
-      }
-    }
-    
-    // Only check wallet status once on mount
-    updateDisplayName()
+    // Set default display name - ConnectWallet will update it if wallet is connected
+    setDisplayName(getOrCreateName())
   }, [])
 
   useEffect(() => {
