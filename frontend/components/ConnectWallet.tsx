@@ -41,7 +41,11 @@ export default function ConnectWallet({ onWalletChange }: ConnectWalletProps) {
       const address = await connect();
       if (address && typeof address === 'string') {
         setPublicKey(address);
+        setIsLoading(false); // Fix: Set loading to false on successful connection
         onWalletChange?.(address);
+      } else {
+        // If no address returned, reset to disconnected
+        await showDisconnected();
       }
     } catch (error) {
       console.log("Connection failed:", error);
