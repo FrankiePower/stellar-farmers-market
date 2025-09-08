@@ -39,6 +39,12 @@ export default function ConnectWallet({ onWalletChange }: ConnectWalletProps) {
     
     try {
       await connect(showConnected);
+      // After connect() completes, check if we actually got a wallet
+      // If not, reset to disconnected state (modal was closed without selection)
+      const currentKey = await getPublicKey();
+      if (!currentKey) {
+        await showDisconnected();
+      }
     } catch (error) {
       console.log("Connection failed:", error);
       // Reset to disconnected state if connection fails
